@@ -1,21 +1,42 @@
+#include "Misc.h"
+#ifndef EthernetShield
+ #include "utility/w5500.h"
+#endif
+
+byte LinkState()
+{
+#if !defined(UID_BASE) && defined(EthernetShield)
+  return (Ethernet.linkStatus() == LinkON);
+#else
+  return !!((W5100.getPHYCFGR()) & 1);
+#endif
+}
+
 /*********************************************************************************************\
    Syslog client
   \*********************************************************************************************/
 void syslog(const char *message)
 {
+#if FEATURE_UDP
   if (Settings.Syslog_IP[0] != 0)
   {
     IPAddress broadcastIP(Settings.Syslog_IP[0], Settings.Syslog_IP[1], Settings.Syslog_IP[2], Settings.Syslog_IP[3]);
     portUDP.beginPacket(broadcastIP, 514);
     char str[256];
     str[0] = 0;
+#if defined(UID_BASE) // STM32
+    snprintf(str, 256, PSTR("<7>ESP Unit: %u : %s"), Settings.Unit, message);
+//    sprintf_P(str, PSTR("<7>ESP Unit: %u : %s"), Settings.Unit, message);    
+#else    
     snprintf_P(str, sizeof(str), PSTR("<7>ESP Unit: %u : %s"), Settings.Unit, message);
+#endif    
     portUDP.write(str);
-    portUDP.endPacket();
+    portUDP.endPacket(); // endpacket causes problems?
   }
+#endif  
 }
 
-
+#if FEATURE_UDP
 /*********************************************************************************************\
    Structs for UDP messaging
   \*********************************************************************************************/
@@ -374,4 +395,4 @@ void sendSysInfoUDP(byte repeats)
     Nodes[Settings.Unit].nodeType = NODE_TYPE_ID;    
   }
 }
-
+#endif

@@ -1,3 +1,7 @@
+#define strcasecmp_P(s1, s2) strcasecmp((s1), (s2))
+#include "ArduinoEasy-Globals.h"
+#include "Misc.h"
+
 String webdata = "";
 
 class DummyWebServer
@@ -42,9 +46,6 @@ DummyWebServer WebServer;
 void WebServerHandleClient() {
   EthernetClient client = MyWebServer.available();
   if (client) {
-#if socketdebug
-    ShowSocketStatus();
-#endif
     // an http request ends with a blank line
     boolean currentLineIsBlank = true;
     String request = "";
@@ -177,8 +178,7 @@ void WebServerHandleClient() {
         }
       }
     }
-    // give the web browser time to receive the data
-    delay(1);
+    // give the web browser time to receive the data    delay(1);
     client.stop();
     webdata = "";
   }
@@ -278,8 +278,8 @@ void handle_root(EthernetClient client, String &post) {
     IPAddress gw = Ethernet.gatewayIP();
 
     reply += printWebString;
-    reply += F("<form>");
-    reply += F("<table><TH>System Info<TH>Value<TH><TH>System Info<TH>Value<TH>");
+    reply += F("<form><table>");
+    reply += F("<TH>System Info<TH>Value<TH><TH>System Info<TH>Value<TH>");
 
     reply += F("<TR><TD>Unit:<TD>");
     reply += Settings.Unit;
@@ -335,11 +335,8 @@ void handle_root(EthernetClient client, String &post) {
     client.print(reply);
     reply = "";
 
-    #if FEATURE_NODELIST_NAMES
-        reply += F("<TR><TH>Node List:<TH>Name<TH>Build<TH>Type<TH>IP<TH>Age");
-    #else
-        reply += F("<TR><TH>Node List:<TH>Build<TH>Type<TH>IP<TH>Age<TH>");
-    #endif
+#if FEATURE_UDP
+    reply += F("<TR><TH>Node List:<TH>Name<TH>Build<TH>Type<TH>IP<TH>Age");
     for (byte x = 0; x < UNIT_MAX; x++)
     {
       if (Nodes[x].ip[0] != 0)
@@ -348,8 +345,8 @@ void handle_root(EthernetClient client, String &post) {
         sprintf_P(url, PSTR("<a class='button-link' href='http://%u.%u.%u.%u'>%u.%u.%u.%u</a>"), Nodes[x].ip[0], Nodes[x].ip[1], Nodes[x].ip[2], Nodes[x].ip[3], Nodes[x].ip[0], Nodes[x].ip[1], Nodes[x].ip[2], Nodes[x].ip[3]);
         reply += F("<TR><TD>Unit ");
         reply += x;
+        reply += F("<TD>");
         #if FEATURE_NODELIST_NAMES
-        reply += F("<TD>");        
         if (x != Settings.Unit)
           reply += Nodes[x].nodeName;
         else
@@ -377,6 +374,9 @@ void handle_root(EthernetClient client, String &post) {
             case NODE_TYPE_ID_NANO_EASY_STD:
               reply += F("Nano Easy");
               break;
+            case NODE_TYPE_ID_RPI_EASY_STD:
+              reply += F("RPI Easy");
+              break;              
           }
         reply += F("<TD>");
         reply += url;
@@ -386,7 +386,7 @@ void handle_root(EthernetClient client, String &post) {
         reply = "";
       }
     }
-
+#endif
     reply += F("</table></form>");
     addFooter(reply);
     client.print(reply);
@@ -532,22 +532,22 @@ void handle_config(EthernetClient client, String &post) {
 
   reply += F("<TR><TH>Optional Settings<TH>");
 
-  reply += F("<TR><TD>ESP IP:<TD><input type='text' name='espip' value='");
+  reply += F("<TR><TD>IP:<TD><input type='text' name='espip' value='");
   sprintf_P(str, PSTR("%u.%u.%u.%u"), Settings.IP[0], Settings.IP[1], Settings.IP[2], Settings.IP[3]);
   reply += str;
 
-  reply += F("'><TR><TD>ESP GW:<TD><input type='text' name='espgateway' value='");
+  reply += F("'><TR><TD>GW:<TD><input type='text' name='espgateway' value='");
   sprintf_P(str, PSTR("%u.%u.%u.%u"), Settings.Gateway[0], Settings.Gateway[1], Settings.Gateway[2], Settings.Gateway[3]);
   reply += str;
 
-  reply += F("'><TR><TD>ESP Subnet:<TD><input type='text' name='espsubnet' value='");
+  reply += F("'><TR><TD>Subnet:<TD><input type='text' name='espsubnet' value='");
   sprintf_P(str, PSTR("%u.%u.%u.%u"), Settings.Subnet[0], Settings.Subnet[1], Settings.Subnet[2], Settings.Subnet[3]);
   reply += str;
 
   client.print(reply);
   reply = "";
 
-  reply += F("'><TR><TD>ESP DNS:<TD><input type='text' name='espdns' value='");
+  reply += F("'><TR><TD>DNS:<TD><input type='text' name='espdns' value='");
   sprintf_P(str, PSTR("%u.%u.%u.%u"), Settings.DNS[0], Settings.DNS[1], Settings.DNS[2], Settings.DNS[3]);
   reply += str;
 
@@ -654,6 +654,19 @@ void handle_hardware(EthernetClient client, String &post) {
 
   if (edit.length() != 0)
   {
+#ifdef STM32_F1 // STM32 F1 detected  
+    Settings.PinBootStates[0]  =  WebServer.arg(F("p0")).toInt();
+    Settings.PinBootStates[1]  =  WebServer.arg(F("p1")).toInt();
+    Settings.PinBootStates[2]  =  WebServer.arg(F("p2")).toInt();
+    Settings.PinBootStates[3]  =  WebServer.arg(F("p3")).toInt();
+    Settings.PinBootStates[8]  =  WebServer.arg(F("p8")).toInt();
+    Settings.PinBootStates[9]  =  WebServer.arg(F("p9")).toInt();
+    Settings.PinBootStates[10] =  WebServer.arg(F("p10")).toInt();    
+    Settings.PinBootStates[13] =  WebServer.arg(F("p13")).toInt();
+    Settings.PinBootStates[14] =  WebServer.arg(F("p14")).toInt();
+    Settings.PinBootStates[15] =  WebServer.arg(F("p15")).toInt();
+    Settings.PinBootStates[16] =  WebServer.arg(F("p16")).toInt();
+#else
     Settings.PinBootStates[2]  =  WebServer.arg(F("p2")).toInt();
     Settings.PinBootStates[3]  =  WebServer.arg(F("p3")).toInt();
     Settings.PinBootStates[5]  =  WebServer.arg(F("p5")).toInt();
@@ -663,6 +676,7 @@ void handle_hardware(EthernetClient client, String &post) {
     Settings.PinBootStates[9] =  WebServer.arg(F("p9")).toInt();
     Settings.PinBootStates[11] =  WebServer.arg(F("p11")).toInt();
     Settings.PinBootStates[12] =  WebServer.arg(F("p12")).toInt();
+#endif            
     SaveSettings();
   }
 
@@ -671,7 +685,39 @@ void handle_hardware(EthernetClient client, String &post) {
 
   reply += F("<form  method='post'><table><TH>Hardware Settings<TH><TR><TD>");
   reply += F("<TR><TD>GPIO boot states:<TD>");
+#ifdef STM32_F1 // STM32 F1 detected  
+  reply += F("<TR><TD>PA0:<TD>");
+  addPinStateSelect(reply, "p0", Settings.PinBootStates[0]);
+  reply += F("<TR><TD>PA1:<TD>");
+  addPinStateSelect(reply, "p1", Settings.PinBootStates[1]);
+  reply += F("<TR><TD>PA2:<TD>");
+  addPinStateSelect(reply, "p2", Settings.PinBootStates[2]);
+  client.print(reply);
+  reply = "";
 
+  reply += F("<TR><TD>PA3:<TD>");
+  addPinStateSelect(reply, "p3", Settings.PinBootStates[3]);
+  reply += F("<TR><TD>PA8:<TD>");
+  addPinStateSelect(reply, "p8", Settings.PinBootStates[8]);
+  reply += F("<TR><TD>PA9:<TD>");
+  addPinStateSelect(reply, "p9", Settings.PinBootStates[9]);
+  client.print(reply);
+  reply = "";
+
+  reply += F("<TR><TD>PA10:<TD>");
+  addPinStateSelect(reply, "p10", Settings.PinBootStates[10]);
+  reply += F("<TR><TD>PA13:<TD>");
+  addPinStateSelect(reply, "p13", Settings.PinBootStates[13]);
+  reply += F("<TR><TD>PA14:<TD>");
+  addPinStateSelect(reply, "p14", Settings.PinBootStates[14]);
+  client.print(reply);
+  reply = "";
+
+  reply += F("<TR><TD>PA15:<TD>");
+  addPinStateSelect(reply, "p15", Settings.PinBootStates[15]);
+  reply += F("<TR><TD>PB0:<TD>");
+  addPinStateSelect(reply, "p16", Settings.PinBootStates[16]);
+#else
   reply += F("<TR><TD>D2:<TD>");
   addPinStateSelect(reply, "p2", Settings.PinBootStates[2]);
   reply += F("<TR><TD>D3:<TD>");
@@ -702,7 +748,7 @@ void handle_hardware(EthernetClient client, String &post) {
 
   reply += F("<TR><TD>D12:<TD>");
   addPinStateSelect(reply, "p12", Settings.PinBootStates[12]);
-
+#endif
   reply += F("<input type='hidden' name='edit' value='1'>");
   reply += F("<TR><TD><TD><input class=\"button-link\" type='submit' value='Submit'><TR><TD>");
 
@@ -840,8 +886,13 @@ void handle_devices(EthernetClient client, String &post) {
         {
           if (Device[DeviceIndex].Type == DEVICE_TYPE_I2C)
           {
+#ifdef STM32_F1 // STM32 F1 detected  
+            reply += F("PB6");
+            reply += F("<BR>PB7");
+#else            
             reply += F("GPIO-20");
             reply += F("<BR>GPIO-21");
+#endif            
           }
           if (Device[DeviceIndex].Type == DEVICE_TYPE_ANALOG)
           {
@@ -954,21 +1005,29 @@ void handle_devices(EthernetClient client, String &post) {
           reply += Settings.TaskDevicePort[index - 1];
           reply += F("'>");
         }
-
         client.print(reply);
         reply = "";
-
-        if (Device[DeviceIndex].Type == DEVICE_TYPE_SINGLE || Device[DeviceIndex].Type == DEVICE_TYPE_DUAL)
+        if (Device[DeviceIndex].Type == DEVICE_TYPE_SINGLE || Device[DeviceIndex].Type == DEVICE_TYPE_DUAL || Device[DeviceIndex].Type == DEVICE_TYPE_TRIPLE)
         {
           reply += F("<TR><TD>1st GPIO:<TD>");
           addPinSelect(false, reply, "taskdevicepin1", Settings.TaskDevicePin1[index - 1]);
+          client.print(reply);
+          reply = "";
         }
-        if (Device[DeviceIndex].Type == DEVICE_TYPE_DUAL)
+        if (Device[DeviceIndex].Type == DEVICE_TYPE_DUAL || Device[DeviceIndex].Type == DEVICE_TYPE_TRIPLE)
         {
-          reply += F("<TR><TD>2nd GPIO:<TD>");
+          reply += F("<TR><TD>2nd GPIO:<TD>");          
           addPinSelect(false, reply, "taskdevicepin2", Settings.TaskDevicePin2[index - 1]);
+          client.print(reply);
+          reply = "";          
         }
-
+        if (Device[DeviceIndex].Type == DEVICE_TYPE_TRIPLE)
+        {
+          reply += F("<TR><TD>3rd GPIO:<TD>");          
+          addPinSelect(false, reply, "taskdevicepin3", Settings.TaskDevicePin3[index - 1]);
+          client.print(reply);
+          reply = "";          
+        }
         if (Device[DeviceIndex].PullUpOption)
         {
           reply += F("<TR><TD>Pull UP:<TD>");
@@ -1166,15 +1225,13 @@ void update_device()
       else
         Settings.TaskDeviceID[index - 1] = 0;
         
-      if (Device[DeviceIndex].Type == DEVICE_TYPE_SINGLE)
+      if ((Device[DeviceIndex].Type == DEVICE_TYPE_SINGLE) || (Device[DeviceIndex].Type == DEVICE_TYPE_DUAL) || (Device[DeviceIndex].Type == DEVICE_TYPE_TRIPLE))
       {
         arg = WebServer.arg(F("taskdevicepin1"));
         Settings.TaskDevicePin1[index - 1] = arg.toInt();
       }
-      if (Device[DeviceIndex].Type == DEVICE_TYPE_DUAL)
+      if ((Device[DeviceIndex].Type == DEVICE_TYPE_DUAL) || (Device[DeviceIndex].Type == DEVICE_TYPE_TRIPLE))
       {
-        arg = WebServer.arg(F("taskdevicepin1"));
-        Settings.TaskDevicePin1[index - 1] = arg.toInt();
         arg = WebServer.arg(F("taskdevicepin2"));
         Settings.TaskDevicePin2[index - 1] = arg.toInt();
       }
@@ -1200,7 +1257,9 @@ void update_device()
         arg = WebServer.arg(F("taskdevicesenddata"));
         Settings.TaskDeviceSendData[index - 1] = (arg == "on");
       }
-      
+
+#if FEATURE_UDP        
+
       if (Settings.GlobalSync)
       {
         if (Device[DeviceIndex].GlobalSyncOption)
@@ -1208,14 +1267,13 @@ void update_device()
           arg = WebServer.arg(F("taskdeviceglobalsync"));
           Settings.TaskDeviceGlobalSync[index - 1] = (arg == "on");
         }
-        
         // Send task info if set global
         if (Settings.TaskDeviceGlobalSync[index - 1])
         {
           SendUDPTaskInfo(0, index - 1, index - 1);
         }
       }
-
+#endif
       for (byte varNr = 0; varNr < Device[DeviceIndex].ValueCount; varNr++)
       {
         taskdeviceformula[varNr].toCharArray(tmpString, 41);
@@ -1365,7 +1423,22 @@ void sortDeviceArray()
 //********************************************************************************
 void addPinSelect(boolean forI2C, String& str, String name,  int choice)
 {
-  String options[10];
+
+#ifdef STM32_F1 // STM32 F1 detected  
+ #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
+  #define PINCOUNT 29
+  String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
+F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC13"),F("PC14"),F("PC15")};
+  int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC13,PC14,PC15};
+ #else
+  #define PINCOUNT 42 
+  String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
+F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC0"),F("PC1"),F("PC2"),F("PC3"),F("PC4"),F("PC5"),F("PC6"),F("PC7"),F("PC8"),F("PC9"),F("PC10"),F("PC11"),F("PC12"),F("PC13"),F("PD0"),F("PD1"),F("PD2")};
+  int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC0,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PD0,PD1,PD2};
+ #endif
+#else // fallback to old pin names  
+  #define PINCOUNT 10
+  String options[PINCOUNT];
   options[0] = F(" ");
   options[1] = F("D2");
   options[2] = F("D3");
@@ -1376,7 +1449,7 @@ void addPinSelect(boolean forI2C, String& str, String name,  int choice)
   options[7] = F("D9");
   options[8] = F("D11");
   options[9] = F("D12");
-  int optionValues[10];
+  int optionValues[PINCOUNT];
   optionValues[0] = -1;
   optionValues[1] = 2;
   optionValues[2] = 3;
@@ -1387,11 +1460,12 @@ void addPinSelect(boolean forI2C, String& str, String name,  int choice)
   optionValues[7] = 9;
   optionValues[8] = 11;
   optionValues[9] = 12;
+#endif  
   str += F("<select name='");
   str += name;
   str += "'>";
-  for (byte x = 0; x < 10; x++)
-  {
+  for (byte x = 0; x < PINCOUNT; x++)
+  {  
     str += F("<option value='");
     str += optionValues[x];
     str += F("'");
@@ -1483,9 +1557,9 @@ void handle_rules(EthernetClient client, String &post) {
 
   String rules = post.substring(7);
   webdata = "";
-
-  if (rules.length() > 0)
+  if ((rules.length() > 0) && (rules.length()<=RULES_MAX_SIZE))
   {
+#if FEATURE_SD
     SD.remove(F("rules.txt"));
     File f = SD.open(F("rules.txt"), FILE_WRITE);
     if (f)
@@ -1493,23 +1567,44 @@ void handle_rules(EthernetClient client, String &post) {
       f.print(rules);
       f.close();
     }
+#elif RUL_START>0
+    FLASH_Unlock();
+    FLASH_ErasePage(RUL_START);
+    Write_Flash(RUL_START, &rules, rules.length());
+    FLASH_Lock();
+#endif
   }
-
   rules = "";
   String reply = "";
   reply += F("<table><th>Rules<TR><TD>");
 
-  // load form data from flash
   reply += F("<form method='post'>");
   reply += F("<textarea name='rules' rows='15' cols='80' wrap='off'>");
   client.print(reply);
   reply = "";
-
+#if FEATURE_SD
   File dataFile = SD.open(F("rules.txt"));
   int filesize = dataFile.size();
   while (dataFile.available()) {
     client.write(dataFile.read());
   }
+#elif RUL_START>0
+ char data[RULES_MAX_SIZE];
+ strncpy(data,(char *)RUL_START,RULES_MAX_SIZE);
+ if (data[0]<32 || data[0]>128)
+ {
+  data[0] = 0;
+ } else
+ {
+  data[RULES_MAX_SIZE] = 0;
+ }
+ byte filesize = strlen(data);
+ if (filesize>0) {
+  client.write(data);
+ }
+#else
+ byte filesize = 0;
+#endif  
   reply += F("</textarea>");
 
   reply += F("<TR><TD>Current size: ");
@@ -1542,8 +1637,9 @@ void handle_tools(EthernetClient client, String &post) {
   reply += F("<a class=\"button-link\" href=\"sysinfo\">Info</a>");
   reply += F("<a class=\"button-link\" href=\"advanced\">Advanced</a><BR><BR>");
   reply += F("<TR><TD>Interfaces<TD><a class=\"button-link\" href=\"/i2cscanner\">I2C Scan</a><BR><BR>");
+#if FEATURE_SD
   reply += F("<TR><TD>Filesystem<TD><a class=\"button-link\" href=\"/SDfilelist\">SD Card</a><BR><BR>");
-
+#endif
   reply += F("<TR><TD>Command<TD>");
   reply += F("<input type='text' name='cmd' value='");
   reply += webrequest;
@@ -1590,12 +1686,12 @@ void handle_advanced(EthernetClient client, String &post) {
   reply += F("<form  method='post'><table>");
   reply += F("<TH>Advanced Settings<TH>Value");
 
+#if FEATURE_MQTT
   reply += F("<TR><TD>Subscribe Template:<TD><input type='text' name='mqttsubscribe' size=80 value='");
   reply += Settings.MQTTsubscribe;
-
   reply += F("'><TR><TD>Publish Template:<TD><input type='text' name='mqttpublish' size=80 value='");
   reply += Settings.MQTTpublish;
-
+#endif
   reply += F("'><TR><TD>Message Delay (ms):<TD><input type='text' name='messagedelay' value='");
   reply += Settings.MessageDelay;
 
@@ -1605,7 +1701,7 @@ void handle_advanced(EthernetClient client, String &post) {
 
   client.print(reply);
   reply = "";
-
+#if FEATURE_UDP
   reply += F("<TR><TD>Use NTP:<TD>");
   if (Settings.UseNTP)
     reply += F("<input type=checkbox name='usentp' checked>");
@@ -1635,11 +1731,11 @@ void handle_advanced(EthernetClient client, String &post) {
 
   reply += F("'><TR><TD>Syslog Level:<TD><input type='text' name='sysloglevel' value='");
   reply += Settings.SyslogLevel;
-
+ 
   reply += F("'><TR><TD>UDP port:<TD><input type='text' name='udpport' value='");
   reply += Settings.UDPPort;
   reply += F("'>");
-
+#endif
   reply += F("<TR><TD>Enable Serial port:<TD>");
   if (Settings.UseSerial)
     reply += F("<input type=checkbox name='useserial' checked>");
@@ -1648,14 +1744,20 @@ void handle_advanced(EthernetClient client, String &post) {
 
   reply += F("<TR><TD>Serial log Level:<TD><input type='text' name='serialloglevel' value='");
   reply += Settings.SerialLogLevel;
+  reply += F("'>");
+  reply += F("<TR><TD>Web log Level:<TD><input type='text' name='webloglevel' value='");
+  reply += Settings.WebLogLevel;
+  reply += F("'>");
 
-  reply += F("'><TR><TD>SD Card log Level:<TD><input type='text' name='sdloglevel' value='");
+#if FEATURE_SD
+  reply += F("<TR><TD>SD Card log Level:<TD><input type='text' name='sdloglevel' value='");
   reply += Settings.SDLogLevel;
-
+  reply += F("'>");
+#endif
   client.print(reply);
   reply = "";
 
-  reply += F("'><TR><TD>Baud Rate:<TD><input type='text' name='baudrate' value='");
+  reply += F("<TR><TD>Baud Rate:<TD><input type='text' name='baudrate' value='");
   reply += Settings.BaudRate;
   reply += F("'>");
 
@@ -1686,12 +1788,14 @@ void update_advanced()
 
   if (edit.length() != 0)
   {
+#if FEATURE_MQTT
     arg = WebServer.arg(F("mqttsubscribe"));
-    arg.toCharArray(tmpString, 81);
+    arg.toCharArray(tmpString, 75);
     arg = WebServer.arg(F("mqttpublish"));
     strcpy(Settings.MQTTsubscribe, tmpString);
-    arg.toCharArray(tmpString, 81);
+    arg.toCharArray(tmpString, 75);
     strcpy(Settings.MQTTpublish, tmpString);
+#endif    
     arg = WebServer.arg(F("messagedelay"));
     Settings.MessageDelay = arg.toInt();
     arg = WebServer.arg(F("ip"));
@@ -1712,6 +1816,8 @@ void update_advanced()
     Settings.UseSerial = (arg == "on");
     arg = WebServer.arg(F("serialloglevel"));
     Settings.SerialLogLevel = arg.toInt();
+    arg = WebServer.arg(F("webloglevel"));
+    Settings.WebLogLevel = arg.toInt();
     arg = WebServer.arg(F("sdloglevel"));
     Settings.SDLogLevel = arg.toInt();
     arg = WebServer.arg(F("baudrate"));
@@ -1720,8 +1826,8 @@ void update_advanced()
     Settings.UseNTP = (arg == "on");
     arg = WebServer.arg(F("dst"));
     Settings.DST = (arg == "on");
-    arg = WebServer.arg(F("wdi2caddress"));
-    Settings.WDI2CAddress = arg.toInt();
+//    arg = WebServer.arg(F("wdi2caddress"));
+//    Settings.WDI2CAddress = arg.toInt();
     arg = WebServer.arg(F("userules"));
     Settings.UseRules = (arg == "on");
     arg = WebServer.arg(F("globalsync"));
@@ -1779,7 +1885,7 @@ void handle_control(EthernetClient client, String &post) {
 // Web Interface SD card file list
 //********************************************************************************
 void handle_SDfilelist(EthernetClient client, String &post) {
-
+#if FEATURE_SD
   String fdelete = WebServer.arg(F("delete"));
 
   if (fdelete.length() > 0)
@@ -1821,6 +1927,7 @@ void handle_SDfilelist(EthernetClient client, String &post) {
   //reply += F("<BR><a class=\"button-link\" href=\"/upload\">Upload</a>");
   addFooter(reply);
   client.print(reply);
+#endif  
 }
 
 //********************************************************************************
@@ -1851,6 +1958,7 @@ String URLEncode(const char* msg)
 // Web Interface server web file from SPIFFS
 //********************************************************************************
 bool handle_unknown(EthernetClient client, String path) {
+#if FEATURE_SD
   //if (!isLoggedIn()) return false;
 
   String dataType = F("text/plain");
@@ -1889,6 +1997,9 @@ bool handle_unknown(EthernetClient client, String path) {
   }
   dataFile.close();
   return true;
+#else
+  return false;
+#endif   
 }
 
 //********************************************************************************
@@ -1901,7 +2012,7 @@ boolean handle_custom(EthernetClient client, String path) {
   client.println(F("Content-Type: text/html"));
   client.println(F("Connection: close"));  // the connection will be closed after completion of the response
   client.println();
-  
+#if FEATURE_DASHBOARD
   if (path.startsWith(F("dashboard"))) // for the dashboard page, create a default unit dropdown selector 
   {
     reply += F("<script><!--\n"
@@ -1914,6 +2025,7 @@ boolean handle_custom(EthernetClient client, String path) {
     byte unit = WebServer.arg(F("unit")).toInt();
     byte btnunit = WebServer.arg(F("btnunit")).toInt();
     if(!unit) unit = btnunit; // unit element prevails, if not used then set to btnunit
+    #if FEATURE_UDP    
     if (unit && unit != Settings.Unit)
     {
       char url[20];
@@ -1962,6 +2074,7 @@ boolean handle_custom(EthernetClient client, String path) {
     reply += F("?btnunit=");
     reply += next;
     reply += F(">&gt;</a>");
+    #endif
   }
 
   // handle commands from a custom page
@@ -1981,6 +2094,7 @@ boolean handle_custom(EthernetClient client, String path) {
   }
 
   // create a dynamic custom page, parsing task values into [<taskname>#<taskvalue>] placeholders and parsing %xx% system variables
+ #if FEATURE_SD
   File dataFile = SD.open(path.c_str(), FILE_READ);
   if (dataFile)
   {
@@ -2024,6 +2138,8 @@ boolean handle_custom(EthernetClient client, String path) {
     else
       return false; // unknown file that does not exist...
   }
+ #endif  
+#endif
   client.print(reply);
   return true;
 }
@@ -2037,14 +2153,19 @@ void handle_i2cscanner(EthernetClient client, String path) {
 
   String reply = "";
   reply += F("<table cellpadding='4' border='1' frame='box' rules='all'><TH>I2C Addresses in use<TH>Supported devices");
-
   byte error, address;
   int nDevices;
   nDevices = 0;
+#if FEATURE_I2C
   for (address = 1; address <= 127; address++ )
   {
     Wire.beginTransmission(address);
     error = Wire.endTransmission();
+    if ((address==0x5C) && (error != 0)) {
+     delay(1);
+     Wire.beginTransmission(address);
+     error = Wire.endTransmission();     
+    }
     if (error == 0)
     {
       reply += F("<TR><TD>0x");
@@ -2109,7 +2230,7 @@ void handle_i2cscanner(EthernetClient client, String path) {
           reply += F("MLX90614");
           break;
         case 0x5C:
-          reply += F("DHT12<BR>BH1750");
+          reply += F("DHT12<BR>BH1750<BR>AM2320");
           break;
         case 0x76:
           reply += F("BME280<BR>BMP280<BR>MS5607<BR>MS5611");
@@ -2129,10 +2250,9 @@ void handle_i2cscanner(EthernetClient client, String path) {
       reply += String(address, HEX);
     }
   }
-
+#endif
   if (nDevices == 0)
     reply += F("<TR>No I2C devices found");
-
   reply += F("</table>");
   addFooter(reply);
   client.print(reply);
@@ -2147,7 +2267,7 @@ void handle_log(EthernetClient client, String path) {
   String reply = "";
   reply += F("<script language='JavaScript'>function RefreshMe(){window.location = window.location}setTimeout('RefreshMe()', 3000);</script>");
   reply += F("<table><TH>Log<TR><TD>");
-
+#if FEATURE_SD
   File dataFile = SD.open(F("log.txt"));
   if (!dataFile)
     return;
@@ -2170,6 +2290,25 @@ void handle_log(EthernetClient client, String path) {
     else
       client.write(data);
   }
+#elif FEATURE_WEBLOG
+    if (logcount != -1)
+  {
+    byte counter = logcount;
+    do
+    {
+      counter++;
+      if (counter > 9)
+        counter = 0;
+      if (Logging[counter].timeStamp > 0)
+      {
+        reply += Logging[counter].timeStamp;
+        reply += " : ";
+        reply += Logging[counter].Message;
+        reply += F("<BR>");
+      }
+    }  while (counter != logcount);
+  }
+#endif    
   reply += F("</table>");
   addFooter(reply);
   client.print(reply);
@@ -2192,7 +2331,7 @@ void handle_sysinfo(EthernetClient client, String path) {
   reply += F("<table><TH>System Info<TH>");
 
   reply += F("<TR><TD>Unit:<TD>");
-  reply += Settings.Unit;
+  reply += String(Settings.Unit);
 
   if (Settings.UseNTP)
   {
@@ -2225,9 +2364,6 @@ void handle_sysinfo(EthernetClient client, String path) {
 
   reply += F("<TR><TD>Free Mem:<TD>");
   reply += freeMem;
-  //reply += F(" (");
-  //reply += lowestRAM;
-  //reply += F(")");
 
   char str[20];
   sprintf_P(str, PSTR("%u.%u.%u.%u"), ip[0], ip[1], ip[2], ip[3]);
@@ -2238,11 +2374,38 @@ void handle_sysinfo(EthernetClient client, String path) {
   reply += F("<TR><TD>GW:<TD>");
   reply += str;
 
+  sprintf_P(str, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  reply += F("<TR><TD>MAC:<TD>");
+  reply += str;
+
   reply += F("<TR><TD>Build:<TD>");
   reply += BUILD;
   reply += F(" ");
   reply += F(BUILD_NOTES);
-
+#if defined(__DATE__) && defined (__TIME__)
+  reply += F("<TR><TD>Build time:<TD>");
+  reply += String(__DATE__) + ", " + String(__TIME__);
+#endif
+  reply += F("<TR><TD>Board type:<TD>");
+#ifdef STM32_F1
+  reply += F("STM32 F1");
+#elif defined(__AVR_ATmega2560__)
+  reply += F("AT MEGA 2560");
+#else
+  reply += F("Unknown");
+#endif
+#ifdef UID_BASE
+  reply += F("<TR><TD>UID:<TD>");
+  reply += String(*(uint32_t*)(UID_BASE), HEX)+" "+String(*(uint32_t*)(UID_BASE+0x04), HEX)+" "+String(*(uint32_t*)(UID_BASE+0x08), HEX);
+#endif 
+#ifdef FLASH_SIZE
+  reply += F("<TR><TD>Flash size:<TD>");
+  reply += String(FLASH_SIZE)+" B";
+#endif
+#ifdef DATA_PARTITION_SIZE
+  reply += F("<TR><TD>Data partition size:<TD>");
+  reply += String(DATA_PARTITION_SIZE*FLASH_PAGE_SIZE)+" B";
+#endif
   reply += F("<TR><TD>Devices:<TD>");
   reply += deviceCount + 1;
 
@@ -2623,4 +2786,3 @@ bool isFormItem(const String& id)
 {
   return (WebServer.arg(id).length() != 0);
 }
-

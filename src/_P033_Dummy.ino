@@ -1,10 +1,9 @@
 //#######################################################################################################
 //#################################### Plugin 033: Dummy ################################################
 //#######################################################################################################
-
 // Adapted from ESP Easy, changes:
 //   WebServer.arg() -> WebServer.arg()
-
+#ifdef USES_P033
 #define PLUGIN_033
 #define PLUGIN_ID_033         33
 #define PLUGIN_NAME_033       "Dummy Device"
@@ -112,4 +111,4 @@ boolean Plugin_033(byte function, struct EventStruct *event, String& string)
   }
   return success;
 }
-
+#endif

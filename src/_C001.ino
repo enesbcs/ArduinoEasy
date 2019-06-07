@@ -1,10 +1,11 @@
 //#######################################################################################################
 //########################### Controller Plugin 001: Domoticz HTTP ######################################
 //#######################################################################################################
-
+#ifdef USES_C001
 #define CPLUGIN_001
 #define CPLUGIN_ID_001         1
 #define CPLUGIN_NAME_001       "Domoticz HTTP"
+#include "Misc.h"
 
 boolean CPlugin_001(byte function, struct EventStruct *event, String& string)
 {
@@ -16,8 +17,13 @@ boolean CPlugin_001(byte function, struct EventStruct *event, String& string)
       {
         Protocol[++protocolCount].Number = CPLUGIN_ID_001;
         Protocol[protocolCount].usesMQTT = false;
+#if FEATURE_BASE64 
         Protocol[protocolCount].usesAccount = true;
         Protocol[protocolCount].usesPassword = true;
+#else
+        Protocol[protocolCount].usesAccount = false;
+        Protocol[protocolCount].usesPassword = false;
+#endif        
         Protocol[protocolCount].defaultPort = 8080;
         break;
       }
@@ -31,6 +37,7 @@ boolean CPlugin_001(byte function, struct EventStruct *event, String& string)
     case CPLUGIN_PROTOCOL_SEND:
       {
         String authHeader = "";
+#if FEATURE_BASE64 
         if ((SecuritySettings.ControllerUser[0] != 0) && (SecuritySettings.ControllerPassword[0] != 0))
         {
           base64 encoder;
@@ -41,7 +48,7 @@ boolean CPlugin_001(byte function, struct EventStruct *event, String& string)
           authHeader += encoder.encode(auth);
           authHeader += F(" \r\n");
         }
-        
+#endif                
         char log[80];
         boolean success = false;
         char host[20];
@@ -59,9 +66,6 @@ boolean CPlugin_001(byte function, struct EventStruct *event, String& string)
           addLog(LOG_LEVEL_ERROR, log);
           return false;
         }
-        #if socketdebug
-          ShowSocketStatus();
-        #endif
         statusLED(true);
         if (connectionFailures)
           connectionFailures--;
@@ -175,4 +179,4 @@ boolean CPlugin_001(byte function, struct EventStruct *event, String& string)
   }
   return success;
 }
-
+#endif

@@ -1,50 +1,35 @@
-#include <utility/W5100.h>
-void ShowSocketStatus() {
 
-  Serial.println("ETHERNET SOCKET LIST");
-  Serial.println("#:Status Port Destination DPort");
-  Serial.println("0=avail,14=waiting,17=connected,22=UDP,1C=close wait");
-  String l_line = "";
-  l_line.reserve(64);
-  char l_buffer[10] = "";
-  for (uint8_t i = 0; i < MAX_SOCK_NUM; i++) {
-    l_line = "#" + String(i);
-    uint8_t s = W5100.readSnSR(i); //status
-    l_line += ":0x";
-    sprintf(l_buffer,"%x",s);
-    l_line += l_buffer;
-    l_line += " ";
-    l_line += String(W5100.readSnPORT(i)); //port
-    l_line += " D:";
-    uint8_t dip[4];
-    W5100.readSnDIPR(i, dip); //IP Address
-    for (int j=0; j<4; j++) {
-      l_line += int(dip[j]);
-      if (j<3) l_line += ".";
-    }
-    l_line += " (";
-    l_line += String(W5100.readSnDPORT(i)); //port on destination
-    l_line += ") ";
-    Serial.println(l_line);
+#if defined(UID_BASE) and FEATURE_SD==false // STM32
+void Write_Flash(uint32_t faddress, void *data, uint16_t datasize)
+{
+  FLASH_Status state;
+  uint16_t addressGap;
+  for (uint16_t i = 0; i < ((datasize+1) / 2); i++)
+  {
+    addressGap = 2 * i;
+    state = FLASH_ProgramHalfWord((faddress + addressGap), ((uint16_t *)data)[i]);
+    if (state != FLASH_COMPLETE)
+    {
+      break;
+    }    
   }
 }
 
-void debugRAM(byte id, int objsize)
-{
-  Serial.print(F("Function:"));
-  Serial.print(id);
-  Serial.print(F(" RAM:"));
-  Serial.print(FreeMem());
-  Serial.print(F(" objsize:"));
-  Serial.println(objsize);
-}
+//uint8_t Read_Flash(uint32_t Address){return *(uint8_t *)Address;}
 
+void LoadFromFlash(uint32_t startindex, byte* memAddress, int datasize)
+{
+  memcpy(memAddress, (uint8_t *)startindex, datasize);
+}
+#endif
+
+#if FEATURE_SD
 void SelectSDCard(boolean sd)
-  {
+{
   digitalWrite(EthernetShield_CS_W5100, sd);
   digitalWrite(EthernetShield_CS_SDCard, !sd);
-  }
-  
+}
+#endif
 /*********************************************************************************************\
    Get value count from sensor type
   \*********************************************************************************************/
@@ -299,8 +284,8 @@ void statusLED(boolean traffic)
   {
     timer = 0;
     byte state = HIGH;
-// todo     if (WiFi.status() == WL_CONNECTED)
-//     state = LOW;
+    // todo     if (WiFi.status() == WL_CONNECTED)
+    //     state = LOW;
 
     if (currentState != state)
     {
@@ -408,12 +393,13 @@ void BuildFixes()
   SaveSettings();
 }
 
+#if FEATURE_SD
 void fileSystemCheck()
 {
   pinMode(EthernetShield_CS_SDCard, OUTPUT);
   pinMode(EthernetShield_CS_W5100, OUTPUT);
   SelectSDCard(true);
-  
+
   if (SD.begin(EthernetShield_CS_SDCard))
   {
     String log = F("SD Mount successful");
@@ -448,7 +434,7 @@ void fileSystemCheck()
     Serial.println(log);
   }
 }
-
+#endif
 
 /********************************************************************************************\
   Find device index corresponding to task number setting
@@ -566,14 +552,25 @@ boolean str2ip(char *string, byte* IP)
   return false;
 }
 
-
 /********************************************************************************************\
   Save settings to SPIFFS
   \*********************************************************************************************/
 void SaveSettings(void)
 {
+#if FEATURE_SD
+  Serial.println(F("Save settings to SD"));
   SaveToFile(F("config.txt"), 0, (byte*)&Settings, sizeof(struct SettingsStruct));
   SaveToFile(F("security.txt"), 0, (byte*)&SecuritySettings, sizeof(struct SecurityStruct));
+#elif (GS_START > 0)
+  Serial.print(F("Save to flash @"));
+  Serial.println(String(GS_START,HEX));
+    FLASH_Unlock();
+    FLASH_ErasePage(GS_START);
+    uint16_t setsize = sizeof(struct SettingsStruct);
+    Write_Flash(GS_START, &Settings, setsize);
+    Write_Flash(GS_START+setsize, &SecuritySettings, sizeof(struct SecurityStruct));
+    FLASH_Lock();
+#endif
 }
 
 
@@ -582,18 +579,50 @@ void SaveSettings(void)
   \*********************************************************************************************/
 boolean LoadSettings()
 {
+#if FEATURE_SD
+  Serial.println(F("Load settings from SD"));
   LoadFromFile(F("config.txt"), 0, (byte*)&Settings, sizeof(struct SettingsStruct));
   LoadFromFile(F("security.txt"), 0, (byte*)&SecuritySettings, sizeof(struct SecurityStruct));
+#elif (GS_START > 0)
+  Serial.print(F("Load from flash @"));
+  Serial.println(String(GS_START,HEX));
+  int settsize = sizeof(struct SettingsStruct);
+  LoadFromFlash(GS_START, (byte*)&Settings, settsize);
+  LoadFromFlash(GS_START+settsize, (byte*)&SecuritySettings, sizeof(struct SecurityStruct));
+#endif
 }
 
+#ifdef ETS_START
+ uint32_t getTaskAddress(byte TaskIndex)
+ {
+   return ETS_START + (TaskIndex*512);
+ }
+ uint32_t getPageAddress(byte TaskIndex)
+ {
+   int pageaddr = (getTaskAddress(TaskIndex) / FLASH_PAGE_SIZE);
+   return (uint32_t)(pageaddr * FLASH_PAGE_SIZE);
+ }
+#endif
 
 /********************************************************************************************\
   Save Task settings to SPIFFS
   \*********************************************************************************************/
 void SaveTaskSettings(byte TaskIndex)
 {
-  ExtraTaskSettings.TaskIndex = TaskIndex;
+  ExtraTaskSettings.TaskIndex = TaskIndex; // (512 * tasknum) bytes after global conf
+#if FEATURE_SD
   SaveToFile(F("config.txt"), 4096 + (TaskIndex * 1024), (byte*)&ExtraTaskSettings, sizeof(struct ExtraTaskSettingsStruct));
+#elif (ETS_START > 0)
+  byte buffer[FLASH_PAGE_SIZE];
+  uint32_t ps = getPageAddress(TaskIndex);
+  LoadFromFlash(ps,(byte*)&buffer,FLASH_PAGE_SIZE);
+  memcpy(&buffer[getTaskAddress(TaskIndex)-ps],(byte*)&ExtraTaskSettings, sizeof(struct ExtraTaskSettingsStruct));
+
+  FLASH_Unlock();
+  FLASH_ErasePage(ps);
+  Write_Flash(ps,&buffer,FLASH_PAGE_SIZE);
+  FLASH_Lock();
+#endif
 }
 
 
@@ -604,8 +633,11 @@ void LoadTaskSettings(byte TaskIndex)
 {
   if (ExtraTaskSettings.TaskIndex == TaskIndex)
     return;
-
+#if FEATURE_SD
   LoadFromFile(F("config.txt"), 4096 + (TaskIndex * 1024), (byte*)&ExtraTaskSettings, sizeof(struct ExtraTaskSettingsStruct));
+#elif (ETS_START > 0)
+  LoadFromFlash(getTaskAddress(TaskIndex), (byte*)&ExtraTaskSettings, sizeof(struct ExtraTaskSettingsStruct));
+#endif
   ExtraTaskSettings.TaskIndex = TaskIndex; // Needed when an empty task was requested
 }
 
@@ -613,53 +645,82 @@ void LoadTaskSettings(byte TaskIndex)
 /********************************************************************************************\
   Save Custom Task settings to SPIFFS
   \*********************************************************************************************/
-void SaveCustomTaskSettings(int TaskIndex, byte* memAddress, int datasize)
+void SaveCustomTaskSettings(int TaskIndex, byte * memAddress, int datasize)
 {
-  if (datasize > 512)
+#if FEATURE_SD
+  if (datasize > 512) // taskmaxdata ~390, custom can go after it
     return;
   SaveToFile(F("config.txt"), 4096 + (TaskIndex * 1024) + 512, memAddress, datasize);
+#elif (ETS_START > 0)
+  if (datasize > (512-sizeof(struct ExtraTaskSettingsStruct)))
+    return;
+  byte buffer[FLASH_PAGE_SIZE];
+  uint32_t ps = getPageAddress(TaskIndex);
+  LoadFromFlash(ps,(byte*)&buffer,FLASH_PAGE_SIZE);
+  memcpy(&buffer[getTaskAddress(TaskIndex)-ps+sizeof(struct ExtraTaskSettingsStruct)], memAddress, datasize);
+
+  FLASH_Unlock();
+  FLASH_ErasePage(ps);
+  Write_Flash(ps,&buffer,FLASH_PAGE_SIZE);
+  FLASH_Lock();
+#endif
 }
 
 
 /********************************************************************************************\
   Save Custom Task settings to SPIFFS
   \*********************************************************************************************/
-void LoadCustomTaskSettings(int TaskIndex, byte* memAddress, int datasize)
+void LoadCustomTaskSettings(int TaskIndex, byte * memAddress, int datasize)
 {
-  if (datasize > 512)
+#if FEATURE_SD
+ if (datasize > 512)
     return;
   LoadFromFile(F("config.txt"), 4096 + (TaskIndex * 1024) + 512, memAddress, datasize);
+#elif (ETS_START > 0)
+  if (datasize > (512-sizeof(struct ExtraTaskSettingsStruct)))
+    return;
+  LoadFromFlash(getTaskAddress(TaskIndex)+sizeof(struct ExtraTaskSettingsStruct), memAddress, datasize);
+#endif
 }
 
 
 /********************************************************************************************\
   Save Custom Controller settings to SPIFFS
   \*********************************************************************************************/
-void SaveCustomControllerSettings(byte* memAddress, int datasize)
+void SaveCustomControllerSettings(byte * memAddress, int datasize)
 {
+#if FEATURE_SD
   if (datasize > 4096)
     return;
   SaveToFile(F("config.txt"), 28672, memAddress, datasize);
+#else
+  return; // NOT IMPLEMENTED TO FLASH
+#endif
 }
 
 
 /********************************************************************************************\
   Save Custom Controller settings to SPIFFS
   \*********************************************************************************************/
-void LoadCustomControllerSettings(byte* memAddress, int datasize)
+void LoadCustomControllerSettings(byte * memAddress, int datasize)
 {
+#if FEATURE_SD
   if (datasize > 4096)
     return;
   LoadFromFile(F("config.txt"), 28672, memAddress, datasize);
+#else
+  return; // NOT IMPLEMENTED TO FLASH
+#endif
 }
 
-
+#if FEATURE_SD
 /********************************************************************************************\
   Save data into config file on SPIFFS
   \*********************************************************************************************/
-void SaveToFile(const __FlashStringHelper* fname, int index, byte* memAddress, int datasize)
+void SaveToFile(const __FlashStringHelper * fname, int index, byte * memAddress, int datasize)
 {
-  File f = SD.open(fname, FILE_WRITE);
+
+  File f = SD.open(fname, O_READ | O_WRITE);
   if (f)
   {
     f.seek(index);
@@ -670,7 +731,12 @@ void SaveToFile(const __FlashStringHelper* fname, int index, byte* memAddress, i
       pointerToByteToSave++;
     }
     f.close();
-    String log = F("FILE : File saved");
+    String log = F("FILE : File saved ");
+    log += fname;
+    log += F(" index ");
+    log += index;
+    log += F(" size ");
+    log += datasize;
     addLog(LOG_LEVEL_INFO, log);
   }
 }
@@ -679,7 +745,7 @@ void SaveToFile(const __FlashStringHelper* fname, int index, byte* memAddress, i
 /********************************************************************************************\
   Load data from config file on SPIFFS
   \*********************************************************************************************/
-void LoadFromFile( const __FlashStringHelper* fname, int index, byte* memAddress, int datasize)
+void LoadFromFile( const __FlashStringHelper * fname, int index, byte * memAddress, int datasize)
 {
   File f = SD.open(fname);
   if (f)
@@ -694,13 +760,14 @@ void LoadFromFile( const __FlashStringHelper* fname, int index, byte* memAddress
     f.close();
   }
 }
-
+#endif
 
 /********************************************************************************************\
   Reset all settings to factory defaults
   \*********************************************************************************************/
 void ResetFactory(void)
 {
+#if FEATURE_SD
   // Direct Serial is allowed here, since this is only an emergency task.
   SD.remove(F("config.txt"));
   SD.remove(F("security.txt"));
@@ -722,15 +789,20 @@ void ResetFactory(void)
   }
   f = SD.open(F("rules.txt"), FILE_WRITE);
   f.close();
+#endif
 
-  LoadSettings();
-  // now we set all parameters that need to be non-zero as default value
+  LoadSettings(); // now we set all parameters that need to be non-zero as default value
 
 #if DEFAULT_USE_STATIC_IP
   str2ip((char*)DEFAULT_IP, Settings.IP);
   str2ip((char*)DEFAULT_DNS, Settings.DNS);
   str2ip((char*)DEFAULT_GW, Settings.Gateway);
   str2ip((char*)DEFAULT_SUBNET, Settings.Subnet);
+#else
+  str2ip((char*)EMPTY_IP, Settings.IP);
+  str2ip((char*)EMPTY_IP, Settings.DNS);
+  str2ip((char*)EMPTY_IP, Settings.Gateway);
+  str2ip((char*)EMPTY_IP, Settings.Subnet);
 #endif
 
   Settings.PID             = ARDUINO_PROJECT_PID;
@@ -744,23 +816,39 @@ void ResetFactory(void)
   Settings.Protocol        = DEFAULT_PROTOCOL;
   strcpy_P(Settings.Name, PSTR(DEFAULT_NAME));
   Settings.SerialLogLevel  = 4;
+  Settings.SyslogLevel     = 0;
+  Settings.UseNTP          = false;
+  Settings.UseDNS          = 0;
   Settings.BaudRate        = 115200;
   Settings.MessageDelay = 1000;
   Settings.CustomCSS = false;
   for (byte x = 0; x < TASKS_MAX; x++)
   {
+    Settings.TaskDeviceNumber[x] = 0;
     Settings.TaskDevicePin1[x] = -1;
     Settings.TaskDevicePin2[x] = -1;
     Settings.TaskDevicePin3[x] = -1;
-    Settings.TaskDevicePin1PullUp[x] = true;
+    Settings.TaskDevicePin1PullUp[x] = false;
     Settings.TaskDevicePin1Inversed[x] = false;
-    Settings.TaskDeviceSendData[x] = true;
+    Settings.TaskDeviceSendData[x] = false;
     Settings.TaskDeviceTimer[x] = Settings.Delay;
   }
+  for (byte x=0; x < 17; x++) {
+    Settings.PinBootStates[x] = 0;
+  }
+  Settings.WebLogLevel = 2;
   Settings.Build = BUILD;
+  Settings.UseRules = false;
   Settings.UseSerial = true;
-  Settings.UDPPort =65500;
+  Settings.Pin_status_led = -1;
+  Settings.UDPPort = 65500;
   SaveSettings();
+#if RUL_START>0
+    FLASH_Unlock();
+    FLASH_ErasePage(RUL_START);
+    Write_Flash(RUL_START, &SecuritySettings.Password, 1); //write an empty string into rules
+    FLASH_Lock();
+#endif  
   delay(1000);
   Reboot();
 }
@@ -789,17 +877,25 @@ void emergencyReset()
 
 /********************************************************************************************\
   Get free system mem
-\*********************************************************************************************/
+  \*********************************************************************************************/
+#if defined(__arm__)
+extern "C" char* sbrk(int incr);
+unsigned long FreeMem(void) {
+  char top = 't';
+  return &top - reinterpret_cast<char*>(sbrk(0));
+}
+#else
 uint8_t *heapptr, *stackptr;
 
 unsigned long FreeMem(void)
-  {
+{
   stackptr = (uint8_t *)malloc(4);        // use stackptr temporarily
   heapptr = stackptr;                     // save value of heap pointer
   free(stackptr);                         // free up the memory again (sets stackptr to 0)
   stackptr =  (uint8_t *)(SP);            // save value of stack pointer
-  return (stackptr-heapptr);
+  return (stackptr - heapptr);
 }
+#endif
 
 /********************************************************************************************\
   In memory convert float to long
@@ -826,7 +922,7 @@ float ul2float(unsigned long ul)
 /********************************************************************************************\
   Add to log
   \*********************************************************************************************/
-void addLog(byte loglevel, String& string)
+void addLog(byte loglevel, String & string)
 {
   addLog(loglevel, string.c_str());
 }
@@ -840,28 +936,41 @@ void addLog(byte loglevel, const char *line)
   if (loglevel <= Settings.SyslogLevel)
     syslog(line);
 
+#if FEATURE_WEBLOG  
+  if (loglevel <= Settings.WebLogLevel)
+  {
+    logcount++;
+    if (logcount > 9)
+      logcount = 0;
+    Logging[logcount].timeStamp = millis();
+    if (Logging[logcount].Message == 0)
+      Logging[logcount].Message =  (char *)malloc(128);
+    strncpy(Logging[logcount].Message, line, 128);
+  }
+#endif    
+#if FEATURE_SD
   if (loglevel <= Settings.SDLogLevel)
   {
     File logFile = SD.open(F("log.txt"), FILE_WRITE);
     if (logFile)
-      {
-        String time = "";
-        time += hour();
-        time += ":";
-        if (minute() < 10)
-          time += "0";
-        time += minute();
-        time += ":";
-        if (second() < 10)
-          time += "0";
-        time += second();
-        time += F(" : ");
-        logFile.print(time);
-        logFile.println(line);
-      }
+    {
+      String time = "";
+      time += hour();
+      time += ":";
+      if (minute() < 10)
+        time += "0";
+      time += minute();
+      time += ":";
+      if (second() < 10)
+        time += "0";
+      time += second();
+      time += F(" : ");
+      logFile.print(time);
+      logFile.println(line);
+    }
     logFile.close();
   }
-    
+#endif
 }
 
 
@@ -885,7 +994,7 @@ void delayedReboot(int rebootDelay)
 /********************************************************************************************\
   Convert a string like "Sun,12:30" into a 32 bit integer
   \*********************************************************************************************/
-unsigned long string2TimeLong(String &str)
+unsigned long string2TimeLong(String & str)
 {
   // format 0000WWWWAAAABBBBCCCCDDDD
   // WWWW=weekday, AAAA=hours tens digit, BBBB=hours, CCCC=minutes tens digit DDDD=minutes
@@ -988,7 +1097,7 @@ String timeLong2String(unsigned long lngTime)
 }
 
 
-String parseTemplate(String &tmpString, byte lineSize)
+String parseTemplate(String & tmpString, byte lineSize)
 {
   String newString = "";
   String tmpStringMid = "";
@@ -1221,7 +1330,7 @@ unsigned int op_arg_count(const char c)
 }
 
 
-int Calculate(const char *input, float* result)
+int Calculate(const char *input, float * result)
 {
   const char *strpos = input, *strend = input + strlen(input);
   char token[25];
@@ -1388,7 +1497,7 @@ uint32_t nextSyncTime = 0;
 
 byte PrevMinutes = 0;
 
-void breakTime(unsigned long timeInput, struct timeStruct &tm) {
+void breakTime(unsigned long timeInput, struct timeStruct & tm) {
   uint8_t year;
   uint8_t month, monthLength;
   uint32_t time;
@@ -1485,6 +1594,21 @@ int weekday()
   return tm.Wday;
 }
 
+byte day()
+{
+  return tm.Day;
+}
+
+int year()
+{
+  return 1970 + tm.Year;
+}
+
+byte month()
+{
+  return tm.Month;
+}
+
 void initTime()
 {
   nextSyncTime = 0;
@@ -1519,9 +1643,10 @@ void checkTime()
 
 unsigned long getNtpTime()
 {
+#if FEATURE_UDP
   const char* ntpServerName = "pool.ntp.org";
-  unsigned long result=0;
-  
+  unsigned long result = 0;
+
   IPAddress timeServerIP;
 
   // The W5100 seems to have an issue with mixing TCP UDP on the same socket.
@@ -1531,19 +1656,13 @@ unsigned long getNtpTime()
   int ret = 0;
   DNSClient dns;
   dns.begin(Ethernet.dnsServerIP());
-  #if socketdebug
-    ShowSocketStatus();
-  #endif
   ret = dns.getHostByName(ntpServerName, timeServerIP);
   if (Settings.UDPPort != 0)
     portUDP.begin(Settings.UDPPort);  // re-use UDP socket for system packets if it was used before
   else
     portUDP.begin(123); // start listening only during this call on port 123
-  #if socketdebug
-    ShowSocketStatus();
-  #endif
 
-  if (ret){
+  if (ret) {
     for (byte x = 1; x < 4; x++)
     {
       String log = F("NTP  : NTP sync request:");
@@ -1593,13 +1712,16 @@ unsigned long getNtpTime()
     } // for
   } // ret
   return result;
+#else
+  return 0;
+#endif
 }
 
 
 /********************************************************************************************\
   Rules processing
   \*********************************************************************************************/
-void rulesProcessing(String& event)
+void rulesProcessing(String & event)
 {
   static uint8_t* data;
   static byte nestingLevel;
@@ -1617,8 +1739,11 @@ void rulesProcessing(String& event)
 
   log = F("EVENT: ");
   log += event;
-  addLog(LOG_LEVEL_INFO, log);
-
+  addLog(LOG_LEVEL_INFO, log);  
+  if (event[0]<32 || event[0]>128){
+   return; 
+  }  
+#if FEATURE_SD
   // load rules from flash memory, stored in offset block 10
   if (data == NULL)
   {
@@ -1637,7 +1762,20 @@ void rulesProcessing(String& event)
     }
     data[RULES_MAX_SIZE - 1] = 0; // make sure it's terminated!
   }
-
+#elif RUL_START>0
+  if (data == NULL)
+  {
+   data = new uint8_t[RULES_MAX_SIZE];
+   strncpy((char *)data,(char *)RUL_START,RULES_MAX_SIZE);
+   if (data[0]<32 || data[0]>128)
+   {
+    data[0] = 0;
+   } else
+   {
+    data[RULES_MAX_SIZE] = 0;
+   }
+  }
+#endif
   int pos = 0;
   String line = "";
   boolean match = false;
@@ -1774,7 +1912,7 @@ void rulesProcessing(String& event)
 /********************************************************************************************\
   Check if an event matches to a given rule
   \*********************************************************************************************/
-boolean ruleMatch(String& event, String& rule)
+boolean ruleMatch(String & event, String & rule)
 {
   boolean match = false;
   String tmpEvent = event;
@@ -1896,7 +2034,7 @@ boolean ruleMatch(String& event, String& rule)
 /********************************************************************************************\
   Check expression
   \*********************************************************************************************/
-boolean conditionMatch(String& check)
+boolean conditionMatch(String & check)
 {
   boolean match = false;
 
@@ -1971,7 +2109,7 @@ void rulesTimers()
       {
         RulesTimer[x] = 0L; // turn off this timer
         String event = F("Rules#Timer=");
-        event += x + 1;
+        event += String(x + 1);
         rulesProcessing(event);
       }
     }
@@ -1985,6 +2123,7 @@ void rulesTimers()
 
 void createRuleEvents(byte TaskIndex)
 {
+  if (Settings.TaskDeviceNumber[TaskIndex] != 0) {
   LoadTaskSettings(TaskIndex);
   byte BaseVarIndex = TaskIndex * VARS_PER_TASK;
   byte DeviceIndex = getDeviceIndex(Settings.TaskDeviceNumber[TaskIndex]);
@@ -1992,16 +2131,17 @@ void createRuleEvents(byte TaskIndex)
   for (byte varNr = 0; varNr < Device[DeviceIndex].ValueCount; varNr++)
   {
     String eventString = ExtraTaskSettings.TaskDeviceName;
-    eventString += F("#");
-    eventString += ExtraTaskSettings.TaskDeviceValueNames[varNr];
-    eventString += F("=");
+    if (eventString.length()>0) {
+     eventString += F("#");
+     eventString += ExtraTaskSettings.TaskDeviceValueNames[varNr];
+     eventString += F("=");
 
-    if (sensorType == SENSOR_TYPE_LONG)
+     if (sensorType == SENSOR_TYPE_LONG)
       eventString += (unsigned long)UserVar[BaseVarIndex] + ((unsigned long)UserVar[BaseVarIndex + 1] << 16);
-    else
+     else
       eventString += UserVar[BaseVarIndex + varNr];
-
-    rulesProcessing(eventString);
+     rulesProcessing(eventString);
+    }
+   }
   }
 }
-

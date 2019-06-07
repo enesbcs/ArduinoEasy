@@ -1,7 +1,7 @@
 //#######################################################################################################
 //#################################### Plugin 002: Analog ###############################################
 //#######################################################################################################
-
+#ifdef USES_P002
 // Adapted from ESP Easy, changes:
 //   WebServer.arg() -> WebServer.arg()
 //   port selection as we have a lot of analog ports here...
@@ -60,3 +60,4 @@ boolean Plugin_002(byte function, struct EventStruct *event, String& string)
   }
   return success;
 }
+#endif

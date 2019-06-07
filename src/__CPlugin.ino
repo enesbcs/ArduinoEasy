@@ -139,4 +139,3 @@ byte CPluginCall(byte Function, struct EventStruct *event)
 
   return false;
 }
-

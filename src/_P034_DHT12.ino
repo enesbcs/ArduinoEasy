@@ -1,7 +1,7 @@
 //#######################################################################################################
 //######################## Plugin 034: Temperature and Humidity sensor DHT 12 (I2C) #####################
 //#######################################################################################################
-
+#ifdef USES_P034
 #define PLUGIN_034
 #define PLUGIN_ID_034         34
 #define PLUGIN_NAME_034       "Temperature & Humidity - DHT12 (I2C)"
@@ -102,3 +102,4 @@ boolean Plugin_034(byte function, struct EventStruct *event, String& string)
   }
   return success;
 }
+#endif

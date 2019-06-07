@@ -1,3 +1,4 @@
+#ifdef USES_P004
 //#######################################################################################################
 //#################################### Plugin 004: TempSensor Dallas DS18B20  ###########################
 //#######################################################################################################
@@ -7,6 +8,7 @@
 #define PLUGIN_NAME_004       "Temperature - DS18b20"
 #define PLUGIN_VALUENAME1_004 "Temperature"
 
+#ifdef __AVR_ATmega2560__
 #define PIN_TO_BASEREG(pin)             (portInputRegister(digitalPinToPort(pin)))
 #define PIN_TO_BITMASK(pin)             (digitalPinToBitMask(pin))
 #define IO_REG_TYPE uint8_t
@@ -19,6 +21,8 @@
 
 IO_REG_TYPE bitmask;
 volatile IO_REG_TYPE *baseReg;
+#endif
+
 uint8_t Plugin_004_DallasPin;
 
 boolean Plugin_004(byte function, struct EventStruct *event, String& string)
@@ -62,10 +66,10 @@ boolean Plugin_004(byte function, struct EventStruct *event, String& string)
 
         // Scan the onewire bus and fill dropdown list with devicecount on this GPIO.
         Plugin_004_DallasPin = Settings.TaskDevicePin1[event->TaskIndex];
-
+#ifdef __AVR_ATmega2560__
         bitmask = PIN_TO_BITMASK(Plugin_004_DallasPin );
         baseReg = PIN_TO_BASEREG(Plugin_004_DallasPin );
-
+#endif
         byte choice = Settings.TaskDevicePluginConfig[event->TaskIndex][0];
         byte devCount = Plugin_004_DS_scan(choice, addr);
         string += F("<TR><TD>Device Nr:<TD><select name='plugin_004_dev'>");
@@ -102,34 +106,51 @@ boolean Plugin_004(byte function, struct EventStruct *event, String& string)
         // find the address for selected device and store into extra tasksettings
         Plugin_004_DallasPin = Settings.TaskDevicePin1[event->TaskIndex];
         byte devCount = Plugin_004_DS_scan(Settings.TaskDevicePluginConfig[event->TaskIndex][0], addr);
-        for (byte x = 0; x < 8; x++)
+        for (byte x = 0; x < PLUGIN_CONFIGLONGVAR_MAX; x++)
           ExtraTaskSettings.TaskDevicePluginConfigLong[x] = addr[x];
+        if (PLUGIN_CONFIGLONGVAR_MAX<8) {
+          for (byte x=(8-PLUGIN_CONFIGLONGVAR_MAX); x<8; x++)
+           Settings.TaskDevicePluginConfig[event->TaskIndex][x] = addr[x];
+        }          
         success = true;
         break;
       }
 
     case PLUGIN_WEBFORM_SHOW_CONFIG:
       {
-        for (byte x = 0; x < 8; x++)
+        for (byte x = 0; x < PLUGIN_CONFIGLONGVAR_MAX; x++)
         {
           if (x != 0)
             string += "-";
           string += String(ExtraTaskSettings.TaskDevicePluginConfigLong[x], HEX);
         }
+        if (PLUGIN_CONFIGLONGVAR_MAX<8) {
+          for (byte x=(8-PLUGIN_CONFIGLONGVAR_MAX); x<8; x++){
+           string += "-";
+           string += String(Settings.TaskDevicePluginConfig[event->TaskIndex][x], HEX);
+          }
+        }        
         success = true;
         break;
       }
 
     case PLUGIN_READ:
       {
+#ifdef __AVR_ATmega2560__
         bitmask = PIN_TO_BITMASK(Plugin_004_DallasPin );
         baseReg = PIN_TO_BASEREG(Plugin_004_DallasPin );
+#endif
         uint8_t addr[8];
         // Load ROM address from tasksettings
         LoadTaskSettings(event->TaskIndex);
-        for (byte x = 0; x < 8; x++)
+        for (byte x = 0; x < PLUGIN_CONFIGLONGVAR_MAX; x++)
           addr[x] = ExtraTaskSettings.TaskDevicePluginConfigLong[x];
-
+        if (PLUGIN_CONFIGLONGVAR_MAX<8) {
+          for (byte x=(8-PLUGIN_CONFIGLONGVAR_MAX); x<8; x++){
+           addr[x] = Settings.TaskDevicePluginConfig[event->TaskIndex][x];
+          }
+        }   
+        
         Plugin_004_DallasPin = Settings.TaskDevicePin1[event->TaskIndex];
         float value = 0;
         String log = F("DS   : Temperature: ");
@@ -145,12 +166,18 @@ boolean Plugin_004(byte function, struct EventStruct *event, String& string)
           log += F("Error!");
         }
         log += (" (");
-        for (byte x = 0; x < 8; x++)
+        for (byte x = 0; x < PLUGIN_CONFIGLONGVAR_MAX; x++)
         {
           if (x != 0)
             log += "-";
           log += String(ExtraTaskSettings.TaskDevicePluginConfigLong[x], HEX);
         }
+        if (PLUGIN_CONFIGLONGVAR_MAX<8) {
+          for (byte x=(8-PLUGIN_CONFIGLONGVAR_MAX); x<8; x++){
+           log += "-";
+           log += String(Settings.TaskDevicePluginConfig[event->TaskIndex][x], HEX);
+          }
+        }           
         log += ')';
         addLog(LOG_LEVEL_INFO, log);
         break;
@@ -237,10 +264,12 @@ boolean Plugin_004_DS_readTemp(uint8_t ROM[8], float *value)
   \*********************************************************************************************/
 uint8_t Plugin_004_DS_reset()
 {
-  IO_REG_TYPE mask = bitmask;
-  volatile IO_REG_TYPE *reg IO_REG_ASM = baseReg;
   uint8_t r;
   uint8_t retries = 125;
+
+#ifdef __AVR_ATmega2560__
+  IO_REG_TYPE mask = bitmask;
+  volatile IO_REG_TYPE *reg IO_REG_ASM = baseReg;
 
   noInterrupts();
   DIRECT_MODE_INPUT(reg, mask);
@@ -262,6 +291,22 @@ uint8_t Plugin_004_DS_reset()
   r = !DIRECT_READ(reg, mask);
   interrupts();
   delayMicroseconds(410);
+#else
+  //noInterrupts();
+  pinMode(Plugin_004_DallasPin, INPUT);
+  do  {  // wait until the wire is high... just in case
+    if (--retries == 0) return 0;
+    delayMicroseconds(2);
+  } while ( !digitalRead(Plugin_004_DallasPin));
+
+  pinMode(Plugin_004_DallasPin, OUTPUT); digitalWrite(Plugin_004_DallasPin, LOW);
+  delayMicroseconds(492); // Dallas spec. = Min. 480uSec. Arduino 500uSec.
+  pinMode(Plugin_004_DallasPin, INPUT); //Float
+  delayMicroseconds(40);
+  r = !digitalRead(Plugin_004_DallasPin);
+  delayMicroseconds(420);
+  //interrupts();
+#endif
   return r;
 }
 
@@ -441,9 +486,10 @@ void Plugin_004_DS_write(uint8_t ByteToWrite)
   \*********************************************************************************************/
 uint8_t Plugin_004_DS_read_bit(void)
 {
+  uint8_t r;
+#ifdef __AVR_ATmega2560__
   IO_REG_TYPE mask=bitmask;
   volatile IO_REG_TYPE *reg IO_REG_ASM = baseReg;
-  uint8_t r;
 
   noInterrupts();
   DIRECT_MODE_OUTPUT(reg, mask);
@@ -453,6 +499,16 @@ uint8_t Plugin_004_DS_read_bit(void)
   delayMicroseconds(10);
   r = DIRECT_READ(reg, mask);
   interrupts();
+#else
+  //noInterrupts();
+  pinMode(Plugin_004_DallasPin, OUTPUT);
+  digitalWrite(Plugin_004_DallasPin, LOW);
+  delayMicroseconds(3);
+  pinMode(Plugin_004_DallasPin, INPUT); // let pin float, pull up will raise
+  delayMicroseconds(10);
+  r = digitalRead(Plugin_004_DallasPin);
+  //interrupts();
+#endif
   delayMicroseconds(53);
   return r;
 }
@@ -463,6 +519,7 @@ uint8_t Plugin_004_DS_read_bit(void)
   \*********************************************************************************************/
 void Plugin_004_DS_write_bit(uint8_t v)
 {
+#ifdef __AVR_ATmega2560__
   IO_REG_TYPE mask=bitmask;
   volatile IO_REG_TYPE *reg IO_REG_ASM = baseReg;
 
@@ -483,6 +540,25 @@ void Plugin_004_DS_write_bit(uint8_t v)
     interrupts();
     delayMicroseconds(5);
   }
+#else
+  if (v & 1) {
+    //noInterrupts();
+    digitalWrite(Plugin_004_DallasPin, LOW);
+    pinMode(Plugin_004_DallasPin, OUTPUT);
+    delayMicroseconds(10);
+    digitalWrite(Plugin_004_DallasPin, HIGH);
+    //interrupts();
+    delayMicroseconds(55);
+  } else {
+    //noInterrupts();
+    digitalWrite(Plugin_004_DallasPin, LOW);
+    pinMode(Plugin_004_DallasPin, OUTPUT);
+    delayMicroseconds(65);
+    digitalWrite(Plugin_004_DallasPin, HIGH);
+    //interrupts();
+    delayMicroseconds(5);
+  }
+#endif
 }
 
 uint8_t Plugin_004_DS_crc8( uint8_t *addr, uint8_t len)
@@ -500,3 +576,4 @@ uint8_t Plugin_004_DS_crc8( uint8_t *addr, uint8_t len)
   }
   return crc;
 }
+#endif // USES_P004

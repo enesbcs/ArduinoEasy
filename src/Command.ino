@@ -1,3 +1,6 @@
+#include "Misc.h"
+#define strcasecmp_P(s1, s2) strcasecmp((s1), (s2))
+
 #define INPUT_COMMAND_SIZE          80
 void ExecuteCommand(byte source, const char *Line)
 {
@@ -19,19 +22,14 @@ void ExecuteCommand(byte source, const char *Line)
   // ****************************************
   // commands for debugging
   // ****************************************
-
-  if (strcasecmp_P(Command, PSTR("w5100")) == 0)
-  {
-    success = true;
-    ShowSocketStatus();
-  }
-
+#if FEATURE_UDP
   if (strcasecmp_P(Command, PSTR("ntp")) == 0)
   {
     success = true;
     getNtpTime();
   }
-
+#endif
+#if FEATURE_SD
   if (strcasecmp_P(Command, PSTR("sdcard")) == 0)
   {
     success = true;
@@ -41,7 +39,7 @@ void ExecuteCommand(byte source, const char *Line)
     printDirectory(root, 0);
     root.close();
   }
-    
+#endif    
   if (strcasecmp_P(Command, PSTR("sysload")) == 0)
   {
     success = true;
@@ -124,9 +122,11 @@ void ExecuteCommand(byte source, const char *Line)
     event = event.substring(6);
     event.replace("$", "#");
     if (Settings.UseRules)
+     {
       rulesProcessing(event);
+     }
   }
-
+#if FEATURE_UDP
   if (strcasecmp_P(Command, PSTR("SendTo")) == 0)
   {
     success = true;
@@ -139,7 +139,7 @@ void ExecuteCommand(byte source, const char *Line)
       SendUDPCommand(Par1, (char*)event.c_str(), event.length());
     }
   }
-  
+
   if (strcasecmp_P(Command, PSTR("SendToUDP")) == 0)
   {
     success = true;
@@ -155,7 +155,7 @@ void ExecuteCommand(byte source, const char *Line)
     portUDP.write(message.c_str(), message.length());
     portUDP.endPacket();
   }
-
+#endif
   if (strcasecmp_P(Command, PSTR("SendToHTTP")) == 0)
   {
     success = true;
@@ -196,18 +196,12 @@ void ExecuteCommand(byte source, const char *Line)
   // configure settings commands
   // ****************************************
 
-  if (strcasecmp_P(Command, PSTR("Reboot")) == 0)
+  if ((strcasecmp_P(Command, PSTR("Reboot")) == 0) || (strcasecmp_P(Command, PSTR("Restart")) == 0))
   {
     success = true;
     Reboot();
   }
 
-  if (strcasecmp_P(Command, PSTR("Restart")) == 0)
-  {
-    success = true;
-    Reboot();
-  }
-  
   if (strcasecmp_P(Command, PSTR("Reset")) == 0)
   {
     success = true;
@@ -259,9 +253,10 @@ void ExecuteCommand(byte source, const char *Line)
     status += F("\nOk");
   else  
     status += F("\nUnknown command!");
+    Serial.println(String(Command)); // DEBUG ONLY!
   SendStatus(source,status);
 }
-
+#if FEATURE_SD
 void printDirectory(File dir, int numTabs) {
    while(true) {
      
@@ -285,3 +280,4 @@ void printDirectory(File dir, int numTabs) {
      entry.close();
    }
 }
+#endif

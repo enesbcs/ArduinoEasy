@@ -1,3 +1,5 @@
+#include "Misc.h"
+
 //********************************************************************************
 // Interface for Sending to Controllers
 //********************************************************************************
@@ -7,8 +9,10 @@ boolean sendData(struct EventStruct *event)
   if (Settings.UseRules)
     createRuleEvents(event->TaskIndex);
 
+#if FEATURE_UDP
   if (Settings.GlobalSync && Settings.TaskDeviceGlobalSync[event->TaskIndex])
     SendUDPTaskData(0, event->TaskIndex, event->TaskIndex);
+#endif
 
   if (!Settings.TaskDeviceSendData[event->TaskIndex])
     return false;
@@ -21,7 +25,8 @@ boolean sendData(struct EventStruct *event)
       uint16_t delayms = Settings.MessageDelay - dif;
       char log[30];
       sprintf_P(log, PSTR("HTTP : Delay %u ms"), delayms);
-      addLog(LOG_LEVEL_DEBUG_MORE, log);
+      String s = String(log);
+      addLog(LOG_LEVEL_DEBUG_MORE, s);
       unsigned long timer = millis() + delayms;
       while (millis() < timer)
         backgroundtasks();
@@ -104,36 +109,30 @@ void MQTTConnect()
   LWTTopic.replace(F("/#"), F("/status"));
   LWTTopic.replace(F("%sysname%"), Settings.Name);
   
-  for (byte x = 1; x < 3; x++)
+  String log = "";
+  boolean MQTTresult = false;
+
+  String msg = F("Connection Lost");
+  if ((SecuritySettings.ControllerUser[0] != 0) && (SecuritySettings.ControllerPassword[0] != 0))
+    MQTTresult = MQTTclient.connect(clientid.c_str(), SecuritySettings.ControllerUser, SecuritySettings.ControllerPassword, LWTTopic.c_str(), 0, 0, msg.c_str());
+  else
+    MQTTresult = MQTTclient.connect(clientid.c_str(), LWTTopic.c_str(), 0, 0, msg.c_str());
+
+  if (MQTTresult)
   {
-    String log = "";
-    boolean MQTTresult = false;
-
-    String msg = F("Connection Lost");
-    if ((SecuritySettings.ControllerUser[0] != 0) && (SecuritySettings.ControllerPassword[0] != 0))
-      MQTTresult = MQTTclient.connect(clientid.c_str(), SecuritySettings.ControllerUser, SecuritySettings.ControllerPassword, LWTTopic.c_str(), 0, 0, msg.c_str());
-    else
-      MQTTresult = MQTTclient.connect(clientid.c_str(), LWTTopic.c_str(), 0, 0, msg.c_str());
-
-    if (MQTTresult)
-    {
-      log = F("MQTT : Connected to broker");
-      addLog(LOG_LEVEL_INFO, log);
-      subscribeTo = Settings.MQTTsubscribe;
-      subscribeTo.replace(F("%sysname%"), Settings.Name);
-      MQTTclient.subscribe(subscribeTo.c_str());
-      log = F("Subscribed to: ");
-      log += subscribeTo;
-      addLog(LOG_LEVEL_INFO, log);
-      break; // end loop if succesfull
-    }
-    else
-    {
-      log = F("MQTT : Failed to connected to broker");
-      addLog(LOG_LEVEL_ERROR, log);
-    }
-
-    delay(500);
+    log = F("MQTT : Connected to broker");
+    addLog(LOG_LEVEL_INFO, log);
+    subscribeTo = Settings.MQTTsubscribe;
+    subscribeTo.replace(F("%sysname%"), Settings.Name);
+    MQTTclient.subscribe(subscribeTo.c_str());
+    log = F("Subscribed to: ");
+    log += subscribeTo;
+    addLog(LOG_LEVEL_INFO, log);
+  }
+  else
+  {
+    log = F("MQTT : Failed to connected to broker");
+    addLog(LOG_LEVEL_ERROR, log);
   }
 }
 
@@ -147,12 +146,14 @@ void MQTTCheck()
   if (Protocol[ProtocolIndex].usesMQTT)
     if (!MQTTclient.connected())
     {
-      String log = F("MQTT : Connection lost");
-      addLog(LOG_LEVEL_ERROR, log);
-      connectionFailures += 2;
-      MQTTclient.disconnect();
-      delay(1000);
-      MQTTConnect();
+      if (millis() - lastMQTTReconnectAttempt > 60000) {
+        // Reconnect attempts once per minute
+        String log = F("MQTT : Connection lost");
+        addLog(LOG_LEVEL_ERROR, log);
+        connectionFailures++;
+        MQTTConnect();
+        lastMQTTReconnectAttempt = millis();
+      }
     }
     else if (connectionFailures)
       connectionFailures--;
@@ -170,4 +171,3 @@ void MQTTStatus(String& status)
   MQTTclient.publish(pubname.c_str(), status.c_str(),Settings.MQTTRetainFlag);
 }
 #endif
-
