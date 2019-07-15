@@ -32,7 +32,7 @@
 #define FEATURE_NOISE                   true // add tone and rtttl commands to p001 ~2kB
 #define FEATURE_SERIAL                  true // provide serial data to plugins - 256bytes
 #define FEATURE_WEBLOG                  true // 184bytes
-#define FEATURE_DASHBOARD               True
+#define FEATURE_DASHBOARD               true
 
 #define USES_C001   // Domoticz HTTP ~2kB
 #define USES_C002   // Domoticz MQTT ~48kB
