@@ -29,6 +29,24 @@ void ExecuteCommand(byte source, const char *Line)
     getNtpTime();
   }
 #endif
+
+#if !defined(STM32_OFFICIAL) && !defined(EthernetShield) && defined(NETSPD_FUNC)
+  if (strcasecmp_P(Command, PSTR("net")) == 0)
+  {
+    success = true;
+    switch (Par1) {
+      case 0: wizphy_setphyconf(PHYCFGR_OPMDC_PDOWN);//powerdown
+      break;
+      case 1: wizphy_setphyconf(PHYCFGR_OPMDC_ALLA); //auto
+      break;
+      case 10: wizphy_setphyconf(PHYCFGR_OPMDC_10F); //10M
+      break;
+      case 100: wizphy_setphyconf(PHYCFGR_OPMDC_100F); //10M
+      break;
+    }
+  }
+#endif
+
 #if FEATURE_SD
   if (strcasecmp_P(Command, PSTR("sdcard")) == 0)
   {

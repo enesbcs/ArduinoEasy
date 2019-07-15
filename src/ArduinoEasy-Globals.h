@@ -20,6 +20,7 @@
 #define UNIT                0
 
 //#define EthernetShield              // uncomment if using a complete shield with W5100 !! - IF commented than single W5500 is the default on SPI1
+#define NETSPD_FUNC                   // comment this line if you do not want to set W5500 LAN speed 10/100 manually
 #define FEATURE_SD             false // enable if no STM32 flash storage available ~10-17kB
 #define FEATURE_UDP            true // needed for DHCP,NTP,P2P ~5kB
 #define FEATURE_BASE64         true // needed for C001 password encoding -640bytes
@@ -31,11 +32,11 @@
 #define FEATURE_NOISE                   true // add tone and rtttl commands to p001 ~2kB
 #define FEATURE_SERIAL                  true // provide serial data to plugins - 256bytes
 #define FEATURE_WEBLOG                  true // 184bytes
-#define FEATURE_DASHBOARD               true
+#define FEATURE_DASHBOARD               True
 
 #define USES_C001   // Domoticz HTTP ~2kB
 #define USES_C002   // Domoticz MQTT ~48kB
-//#define USES_C005   // OpenHAB MQTT ~4kB
+#define USES_C005   // OpenHAB MQTT ~4kB
 
 #define USES_P001   // Switch ~4-6kB
 #define USES_P002   // ADC    344bytes
@@ -49,7 +50,8 @@
 #define USES_P028   // BMx280  ~9kB
 #define USES_P029   // Output  184bytes
 #define USES_P033   // Dummy   928bytes
-//#define USES_P034   // DHT12   528bytes
+#define USES_P034   // DHT12   528bytes
+#define USES_P038   // Neopixel/WS2812 ~1k
 #define USES_P051   // AM2320  720bytes
 
 // Challenges on Arduino/W5100 ethernet platform:
@@ -77,7 +79,7 @@
 
 #define ARDUINO_PROJECT_PID       2016110201L
 #define VERSION                             2
-#define BUILD                             155
+#define BUILD                             156
 #define BUILD_NOTES                        "STM32fix"
 
 #define NODE_TYPE_ID_ESP_EASY_STD           1
@@ -105,10 +107,14 @@
 
 #ifdef __AVR_ATmega2560__      // Arduino Mega
  #define DEVICES_MAX                        8 // ESP Easy 64
- #define TASKS_MAX                          8 // ESP Easy 12, Arduino maybe 4/8
+ #ifndef TASKS_MAX
+  #define TASKS_MAX                          8 // ESP Easy 12, Arduino maybe 4/8
+ #endif
 #else
  #define DEVICES_MAX                        16 // ESP Easy 64
- #define TASKS_MAX                          16 // ESP Easy 12, STM32 with 128k flash=4/8, if more can be 8/16!
+ #ifndef TASKS_MAX
+  #define TASKS_MAX                          16 // ESP Easy 12, STM32 with 128k flash=4/8, if more can be 8/16!
+ #endif
 #endif 
 
 #define VARS_PER_TASK                       4
@@ -194,31 +200,54 @@
  #include <ArduinoJson.h>
 #endif
 
+#ifndef UID_BASE
 // https://github.com/rogerclarkmelbourne/Arduino_STM32 //
-#define UID_BASE 0x1FFFF7E8U /*!< Unique device ID register base address - F1 series only */
-#if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
- #define STM32_F1
- #define FLASH_SIZE       131072
- #define FLASH_PAGE_SIZE  0x400
-#elif defined(MCU_STM32F103RC) || defined(MCU_STM32F103VC) || defined(MCU_STM32F103ZC)
- #define STM32_F1
- #define FLASH_SIZE       262144
- #define FLASH_PAGE_SIZE  0x800 
-#elif defined(MCU_STM32F103RD) || defined(MCU_STM32F103VD) || defined(MCU_STM32F103ZD)
- #define STM32_F1
- #define FLASH_SIZE       393216
- #define FLASH_PAGE_SIZE  0x800  
-#elif defined(MCU_STM32F103RE) || defined(MCU_STM32F103VE) || defined(MCU_STM32F103ZE)
- #define STM32_F1
- #define FLASH_SIZE       524288
- #define FLASH_PAGE_SIZE  0x800  
-#else
- #define FLASH_SIZE 0
- #undef UID_BASE
+ #define UID_BASE 0x1FFFF7E8U /*!< Unique device ID register base address - F1 series only */
+ #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
+  #define STM32_F1
+  #define FLASH_SIZE       131072
+  #define FLASH_PAGE_SIZE  0x400
+ #elif defined(MCU_STM32F103RC) || defined(MCU_STM32F103VC) || defined(MCU_STM32F103ZC)
+  #define STM32_F1
+  #define FLASH_SIZE       262144
+  #define FLASH_PAGE_SIZE  0x800 
+ #elif defined(MCU_STM32F103RD) || defined(MCU_STM32F103VD) || defined(MCU_STM32F103ZD)
+  #define STM32_F1
+  #define FLASH_SIZE       393216
+  #define FLASH_PAGE_SIZE  0x800  
+ #elif defined(MCU_STM32F103RE) || defined(MCU_STM32F103VE) || defined(MCU_STM32F103ZE)
+  #define STM32_F1
+  #define FLASH_SIZE       524288
+  #define FLASH_PAGE_SIZE  0x800  
+ #else
+  #define FLASH_SIZE 0
+  #undef UID_BASE
+ #endif
+#else // Official core
+ #pragma message "This Core is totally unsupported!"  
+ #if defined(STM32F103xB)
+  #define STM32_OFFICIAL
+  #define STM32_F1
+  #define FLASH_SIZE       131072
+  #ifndef FLASH_PAGE_SIZE
+   #define FLASH_PAGE_SIZE  0x400
+  #endif
+ #elif defined(STM32F103xE)
+  #define STM32_OFFICIAL
+  #define STM32_F1
+  #define FLASH_SIZE       524288
+  #ifndef FLASH_PAGE_SIZE
+   #define FLASH_PAGE_SIZE  0x800  
+  #endif
+ #else
+  #define FLASH_SIZE 0
+  #error "Unknown board!"  
+ #endif
+
 #endif
 
 #include <SPI.h>
-#if !defined(UID_BASE) && defined(EthernetShield)
+#if (!defined(UID_BASE) && defined(EthernetShield)) || defined(STM32_OFFICIAL)
  #include <Ethernet.h>
 #else
  #include <Ethernet_STM.h>
@@ -245,7 +274,9 @@
  #endif
  #include <SD.h>
 #elif defined(STM32_F1)
- #include "flash_stm32.h" // currently only STM32 internal Flash is supported as Data storage
+ #ifndef STM32_OFFICIAL
+  #include "flash_stm32.h" // currently only STM32 internal Flash is supported as Data storage
+ #endif
  #if FLASH_SIZE>=120000
   #if defined(FLASH_PAGE_SIZE)
    #define RULES_MAX_SIZE FLASH_PAGE_SIZE
@@ -259,7 +290,7 @@
      #endif
      #define GS_START   (0x8000000 + FLASH_SIZE - (DATA_PARTITION_SIZE * FLASH_PAGE_SIZE))
      #define ETS_START  (0x8000000 + FLASH_SIZE - ((DATA_PARTITION_SIZE-1) * FLASH_PAGE_SIZE))
-     #define RUL_START  (0x8000000 + FLASH_SIZE - (1 * FLASH_PAGE_SIZE))
+     #define RUL_START  (0x8000000 + FLASH_SIZE - (1 * FLASH_PAGE_SIZE))   
    #elif (FLASH_PAGE_SIZE==0x800)
      #if TASKS_MAX<=4
       #define DATA_PARTITION_SIZE 3 // 6kB data partition
@@ -279,6 +310,7 @@
      #define GS_START   0
      #undef ETS_START
      #define RUL_START  0
+     #error "Neither SD storage, nor STM32F1 flash storage is available!"
    #endif
   #endif
  #endif

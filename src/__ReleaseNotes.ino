@@ -1,3 +1,7 @@
+// R155 09-06-2019
+// Added STM32 compatibility
+// Major code fixing using IFDEF to add selectable features (dynamic code sizing)
+
 // R154 26-08-2017
 // Removed pin select D4 from the list as it is used for SD Card
 // Fixed Dallas plugin for AVR

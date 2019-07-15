@@ -379,14 +379,21 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
 
 boolean Plugin_001_updatable_pin(int pin) {
 #ifdef STM32_F1 // STM32 F1 detected  
- #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
-   return (pin>=PA0 || pin<= PC15);
+ #ifdef STM32_OFFICIAL
+  #if defined(STM32F103xB)
+   return (pin>=0 || pin<= 34);
+  #endif
  #else
+  #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
+   return (pin>=PA0 || pin<= PC15);
+  #else
    return (pin>=PA0 || pin<= PD2);
+  #endif
  #endif
 #else // fallback
   return pin == 3 || ( pin >= 5 && pin <= 9) || ( pin >= 14 && pin <= 49) || ( pin >= 56 && pin <= 69);
 #endif
+ return false;
 }
 
 #if FEATURE_NOISE

@@ -1,11 +1,32 @@
 #include "Misc.h"
-#ifndef EthernetShield
+
+#if !defined(STM32_OFFICIAL) && !defined(EthernetShield) && defined(NETSPD_FUNC)
  #include "utility/w5500.h"
+
+void wizphy_setphyconf(uint8_t pconf)
+{
+   uint8_t tmp = 0;
+   tmp |= PHYCFGR_OPMD;
+   tmp |= pconf;
+   W5100.setPHYCFGR(tmp);
+   wizphy_reset();
+}
+
+
+void wizphy_reset(void)
+{
+   uint8_t tmp = W5100.getPHYCFGR();
+   tmp &= PHYCFGR_RST;
+   W5100.setPHYCFGR(tmp);
+   tmp = W5100.getPHYCFGR();
+   tmp |= ~PHYCFGR_RST;
+   W5100.setPHYCFGR(tmp);
+}
 #endif
 
 byte LinkState()
 {
-#if !defined(UID_BASE) && defined(EthernetShield)
+#if (!defined(UID_BASE) && defined(EthernetShield)) || defined(STM32_OFFICIAL)
   return (Ethernet.linkStatus() == LinkON);
 #else
   return !!((W5100.getPHYCFGR()) & 1);

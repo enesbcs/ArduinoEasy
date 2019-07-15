@@ -45,10 +45,16 @@
 #include "WebServer.h"
 
 #ifdef STM32_F1
- #include <libmaple/nvic.h> 
- void Reboot(void) {
-  nvic_sys_reset();
- }
+ #ifdef STM32_OFFICIAL
+  void Reboot(void) {
+   HAL_NVIC_SystemReset();
+  }
+ #else
+  #include <libmaple/nvic.h> 
+  void Reboot(void) {
+   nvic_sys_reset();
+  }
+ #endif
 #else
  void(*Reboot)(void) = 0;
 #endif
@@ -121,7 +127,7 @@ void setup()
 #endif
   emergencyReset();
   LoadSettings();
-
+  
 //if (Settings.UseRules){ResetFactory(); }// DEBUG ONLY!!
 
   ExtraTaskSettings.TaskIndex = 255; // make sure this is an unused nr to prevent cache load on boot
@@ -141,7 +147,7 @@ void setup()
     Serial.println(Settings.Version);
     Serial.println(F("INIT : Incorrect PID or version!"));
     delay(1000);
-    ResetFactory();
+    ResetFactory(); // DEBUG !!
   }
 
   if (systemOK)

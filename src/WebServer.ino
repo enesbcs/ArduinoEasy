@@ -654,7 +654,8 @@ void handle_hardware(EthernetClient client, String &post) {
 
   if (edit.length() != 0)
   {
-#ifdef STM32_F1 // STM32 F1 detected  
+#ifdef STM32_F1 // STM32 F1 detected
+   #ifndef STM32_OFFICIAL
     Settings.PinBootStates[0]  =  WebServer.arg(F("p0")).toInt();
     Settings.PinBootStates[1]  =  WebServer.arg(F("p1")).toInt();
     Settings.PinBootStates[2]  =  WebServer.arg(F("p2")).toInt();
@@ -666,6 +667,23 @@ void handle_hardware(EthernetClient client, String &post) {
     Settings.PinBootStates[14] =  WebServer.arg(F("p14")).toInt();
     Settings.PinBootStates[15] =  WebServer.arg(F("p15")).toInt();
     Settings.PinBootStates[16] =  WebServer.arg(F("p16")).toInt();
+   #else
+    Settings.PinBootStates[0]  =  WebServer.arg(F("p0")).toInt();
+    Settings.PinBootStates[1]  =  WebServer.arg(F("p1")).toInt();
+    Settings.PinBootStates[2]  =  WebServer.arg(F("p2")).toInt();
+    Settings.PinBootStates[3]  =  WebServer.arg(F("p3")).toInt();
+    Settings.PinBootStates[4]  =  WebServer.arg(F("p4")).toInt();
+    Settings.PinBootStates[5]  =  WebServer.arg(F("p5")).toInt();
+    Settings.PinBootStates[6]  =  WebServer.arg(F("p6")).toInt();
+    Settings.PinBootStates[7]  =  WebServer.arg(F("p7")).toInt();
+    Settings.PinBootStates[8]  =  WebServer.arg(F("p8")).toInt();
+    Settings.PinBootStates[9]  =  WebServer.arg(F("p9")).toInt();
+    Settings.PinBootStates[10] =  WebServer.arg(F("p10")).toInt();    
+    Settings.PinBootStates[11] =  WebServer.arg(F("p11")).toInt();
+    Settings.PinBootStates[12] =  WebServer.arg(F("p12")).toInt();    
+    Settings.PinBootStates[13] =  WebServer.arg(F("p13")).toInt();
+    Settings.PinBootStates[14] =  WebServer.arg(F("p14")).toInt();
+   #endif
 #else
     Settings.PinBootStates[2]  =  WebServer.arg(F("p2")).toInt();
     Settings.PinBootStates[3]  =  WebServer.arg(F("p3")).toInt();
@@ -686,6 +704,7 @@ void handle_hardware(EthernetClient client, String &post) {
   reply += F("<form  method='post'><table><TH>Hardware Settings<TH><TR><TD>");
   reply += F("<TR><TD>GPIO boot states:<TD>");
 #ifdef STM32_F1 // STM32 F1 detected  
+ #ifndef STM32_OFFICIAL
   reply += F("<TR><TD>PA0:<TD>");
   addPinStateSelect(reply, "p0", Settings.PinBootStates[0]);
   reply += F("<TR><TD>PA1:<TD>");
@@ -717,6 +736,47 @@ void handle_hardware(EthernetClient client, String &post) {
   addPinStateSelect(reply, "p15", Settings.PinBootStates[15]);
   reply += F("<TR><TD>PB0:<TD>");
   addPinStateSelect(reply, "p16", Settings.PinBootStates[16]);
+ #else
+  reply += F("<TR><TD>PB11:<TD>");
+  addPinStateSelect(reply, "p0", Settings.PinBootStates[0]);
+  reply += F("<TR><TD>PB10:<TD>");
+  addPinStateSelect(reply, "p1", Settings.PinBootStates[1]);
+  reply += F("<TR><TD>PB2:<TD>");
+  addPinStateSelect(reply, "p2", Settings.PinBootStates[2]);
+  client.print(reply);
+  reply = "";
+
+  reply += F("<TR><TD>PB0:<TD>");
+  addPinStateSelect(reply, "p3", Settings.PinBootStates[3]);
+  reply += F("<TR><TD>PA7:<TD>");
+  addPinStateSelect(reply, "p4", Settings.PinBootStates[8]);
+  reply += F("<TR><TD>PA6:<TD>");
+  addPinStateSelect(reply, "p5", Settings.PinBootStates[9]);
+  client.print(reply);
+  reply = "";
+  reply += F("<TR><TD>PA5:<TD>");
+  addPinStateSelect(reply, "p6", Settings.PinBootStates[3]);
+  reply += F("<TR><TD>PA4:<TD>");
+  addPinStateSelect(reply, "p7", Settings.PinBootStates[8]);
+  reply += F("<TR><TD>PA3:<TD>");
+  addPinStateSelect(reply, "p8", Settings.PinBootStates[9]);
+  reply += F("<TR><TD>PA2:<TD>");
+  addPinStateSelect(reply, "p9", Settings.PinBootStates[9]);
+  client.print(reply);
+  reply = "";
+
+  reply += F("<TR><TD>PA1:<TD>");
+  addPinStateSelect(reply, "p10", Settings.PinBootStates[10]);
+  reply += F("<TR><TD>PA0:<TD>");
+  addPinStateSelect(reply, "p11", Settings.PinBootStates[13]);
+  reply += F("<TR><TD>PC15:<TD>");
+  addPinStateSelect(reply, "p12", Settings.PinBootStates[13]);
+  reply += F("<TR><TD>PC14:<TD>");
+  addPinStateSelect(reply, "p13", Settings.PinBootStates[13]);
+  reply += F("<TR><TD>PC13:<TD>");
+  addPinStateSelect(reply, "p14", Settings.PinBootStates[14]);
+  client.print(reply);
+ #endif
 #else
   reply += F("<TR><TD>D2:<TD>");
   addPinStateSelect(reply, "p2", Settings.PinBootStates[2]);
@@ -762,21 +822,25 @@ void handle_hardware(EthernetClient client, String &post) {
 //********************************************************************************
 void addPinStateSelect(String& str, String name,  int choice)
 {
-  String options[4];
+  String options[6];
   options[0] = F("Default");
   options[1] = F("Output Low");
   options[2] = F("Output High");
   options[3] = F("Input");
-  int optionValues[4];
+  options[4] = F("Input Pulldown");
+  options[5] = F("Input Pullup");
+  int optionValues[6];
   optionValues[0] = 0;
   optionValues[1] = 1;
   optionValues[2] = 2;
   optionValues[3] = 3;
+  optionValues[4] = 4;
+  optionValues[5] = 5;
 
   str += F("<select name='");
   str += name;
   str += F("'>");
-  for (byte x = 0; x < 4; x++)
+  for (byte x = 0; x < 6; x++)
   {
     str += F("<option value='");
     str += optionValues[x];
@@ -1425,16 +1489,25 @@ void addPinSelect(boolean forI2C, String& str, String name,  int choice)
 {
 
 #ifdef STM32_F1 // STM32 F1 detected  
- #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
-  #define PINCOUNT 29
+ #ifdef STM32_OFFICIAL
+  #if defined(STM32F103xB)
+   #define PINCOUNT 28
   String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
 F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC13"),F("PC14"),F("PC15")};
   int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC13,PC14,PC15};
+  #endif
  #else
-  #define PINCOUNT 42 
+  #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
+   #define PINCOUNT 28
+  String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
+F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC13"),F("PC14"),F("PC15")};
+  int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC13,PC14,PC15};
+  #else
+   #define PINCOUNT 42 
   String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
 F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC0"),F("PC1"),F("PC2"),F("PC3"),F("PC4"),F("PC5"),F("PC6"),F("PC7"),F("PC8"),F("PC9"),F("PC10"),F("PC11"),F("PC12"),F("PC13"),F("PD0"),F("PD1"),F("PD2")};
   int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC0,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PD0,PD1,PD2};
+  #endif
  #endif
 #else // fallback to old pin names  
   #define PINCOUNT 10
@@ -1555,9 +1628,10 @@ void addTaskValueSelect(String& str, String name,  int choice, byte TaskIndex)
 void handle_rules(EthernetClient client, String &post) {
   //if (!isLoggedIn()) return;
 
-  String rules = post.substring(7);
+//  String rules = post.substring(7);
+  String rules = WebServer.arg(F("rules"));
   webdata = "";
-  if ((rules.length() > 0) && (rules.length()<=RULES_MAX_SIZE))
+  if (rules.length()<=RULES_MAX_SIZE)
   {
 #if FEATURE_SD
     SD.remove(F("rules.txt"));
@@ -1570,7 +1644,7 @@ void handle_rules(EthernetClient client, String &post) {
 #elif RUL_START>0
     FLASH_Unlock();
     FLASH_ErasePage(RUL_START);
-    Write_Flash(RUL_START, &rules, rules.length());
+    Write_Flash(RUL_START, (char*)rules.c_str(), rules.length()+1); // rules.length() ?
     FLASH_Lock();
 #endif
   }
@@ -1590,8 +1664,8 @@ void handle_rules(EthernetClient client, String &post) {
   }
 #elif RUL_START>0
  char data[RULES_MAX_SIZE];
- strncpy(data,(char *)RUL_START,RULES_MAX_SIZE);
- if (data[0]<32 || data[0]>128)
+ LoadFromFlash(RUL_START, (byte*)&data, RULES_MAX_SIZE);
+ if (data[0]<32 || data[0]==255)
  {
   data[0] = 0;
  } else
@@ -1691,8 +1765,9 @@ void handle_advanced(EthernetClient client, String &post) {
   reply += Settings.MQTTsubscribe;
   reply += F("'><TR><TD>Publish Template:<TD><input type='text' name='mqttpublish' size=80 value='");
   reply += Settings.MQTTpublish;
+  reply += F("'>");
 #endif
-  reply += F("'><TR><TD>Message Delay (ms):<TD><input type='text' name='messagedelay' value='");
+  reply += F("<TR><TD>Message Delay (ms):<TD><input type='text' name='messagedelay' value='");
   reply += Settings.MessageDelay;
 
   reply += F("'><TR><TD>Fixed IP Octet:<TD><input type='text' name='ip' value='");

@@ -1,5 +1,36 @@
 
 #if defined(UID_BASE) and FEATURE_SD==false // STM32
+#ifdef STM32_OFFICIAL
+
+#define FLASH_Unlock HAL_FLASH_Unlock
+#define FLASH_Lock HAL_FLASH_Lock
+
+void FLASH_ErasePage(uint32_t paddress) 
+{
+ uint32_t error = 0;
+ FLASH_EraseInitTypeDef erase_pages;
+ erase_pages.PageAddress = paddress;
+ erase_pages.NbPages = 1;
+ erase_pages.TypeErase = FLASH_TYPEERASE_PAGES;
+ HAL_FLASHEx_Erase (&erase_pages, &error);
+}
+
+void Write_Flash(uint32_t faddress, void *data, uint16_t datasize)
+{
+  HAL_StatusTypeDef state;
+  uint16_t addressGap;
+  for (uint16_t i = 0; i < ((datasize+1) / 2); i++)
+  {
+    addressGap = 2 * i;
+    state = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, (faddress + addressGap), ((uint16_t *)data)[i]);
+    if (state != HAL_OK)
+    {
+      break;
+    }    
+  }
+}
+
+#else
 void Write_Flash(uint32_t faddress, void *data, uint16_t datasize)
 {
   FLASH_Status state;
@@ -14,7 +45,7 @@ void Write_Flash(uint32_t faddress, void *data, uint16_t datasize)
     }    
   }
 }
-
+#endif
 //uint8_t Read_Flash(uint32_t Address){return *(uint8_t *)Address;}
 
 void LoadFromFlash(uint32_t startindex, byte* memAddress, int datasize)
@@ -1644,7 +1675,7 @@ void checkTime()
 unsigned long getNtpTime()
 {
 #if FEATURE_UDP
-  const char* ntpServerName = "pool.ntp.org";
+//  const char* ntpServerName = "pool.ntp.org";
   unsigned long result = 0;
 
   IPAddress timeServerIP;
@@ -1656,7 +1687,7 @@ unsigned long getNtpTime()
   int ret = 0;
   DNSClient dns;
   dns.begin(Ethernet.dnsServerIP());
-  ret = dns.getHostByName(ntpServerName, timeServerIP);
+  ret = dns.getHostByName(Settings.NTPHost, timeServerIP);
   if (Settings.UDPPort != 0)
     portUDP.begin(Settings.UDPPort);  // re-use UDP socket for system packets if it was used before
   else

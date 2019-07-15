@@ -23,8 +23,16 @@ void hardwareInit()
           setPinState(1, x, PIN_MODE_OUTPUT, HIGH);
           break;
         case 3:
-          pinMode(x,INPUT_PULLUP);
+          pinMode(x,INPUT);
           setPinState(1, x, PIN_MODE_INPUT, 0);
+          break;
+        case 4:
+          pinMode(x,INPUT_PULLDOWN);
+          setPinState(1, x, PIN_MODE_INPUT, 0);
+          break;
+        case 5:
+          pinMode(x,INPUT_PULLUP);
+          setPinState(1, x, PIN_MODE_INPUT, 1);
           break;
       }
 
