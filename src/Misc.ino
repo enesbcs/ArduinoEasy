@@ -12,6 +12,7 @@ void FLASH_ErasePage(uint32_t paddress)
  erase_pages.PageAddress = paddress;
  erase_pages.NbPages = 1;
  erase_pages.TypeErase = FLASH_TYPEERASE_PAGES;
+// Serial.print("erase page: "); Serial.println(paddress);  // DEBUG
  HAL_FLASHEx_Erase (&erase_pages, &error);
 }
 
@@ -19,6 +20,7 @@ void Write_Flash(uint32_t faddress, void *data, uint16_t datasize)
 {
   HAL_StatusTypeDef state;
   uint16_t addressGap;
+ //Serial.print("write flash @"); Serial.println(faddress);  // DEBUG
   for (uint16_t i = 0; i < ((datasize+1) / 2); i++)
   {
     addressGap = 2 * i;

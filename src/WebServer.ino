@@ -1495,6 +1495,11 @@ void addPinSelect(boolean forI2C, String& str, String name,  int choice)
   String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
 F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC13"),F("PC14"),F("PC15")};
   int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC13,PC14,PC15};
+  #elif defined(STM32F103xE)
+   #define PINCOUNT 42 
+  String options[] = {F(" "),F("PA0"),F("PA1"),F("PA2"),F("PA3"),F("PA8"),F("PA9"),F("PA10"),F("PA13"),F("PA14"),F("PA15"),F("PB0"),F("PB1"),F("PB3"),F("PB4"),F("PB5"),F("PB6"),F("PB7"),
+F("PB8"),F("PB10"),F("PB11"),F("PB12"),F("PB13"),F("PB14"),F("PB15"),F("PC0"),F("PC1"),F("PC2"),F("PC3"),F("PC4"),F("PC5"),F("PC6"),F("PC7"),F("PC8"),F("PC9"),F("PC10"),F("PC11"),F("PC12"),F("PC13"),F("PD0"),F("PD1"),F("PD2")};
+  int optionValues[] = {-1,PA0,PA1,PA2,PA3,PA8,PA9,PA10,PA13,PA14,PA15,PB0,PB1,PB3,PB4,PB5,PB6,PB7,PB8,PB10,PB11,PB12,PB13,PB14,PB15,PC0,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PD0,PD1,PD2}; 
   #endif
  #else
   #if defined(MCU_STM32F103TB) || defined(MCU_STM32F103CB) || defined(MCU_STM32F103RB) || defined(MCU_STM32F103VB)
@@ -2324,6 +2329,7 @@ void handle_i2cscanner(EthernetClient client, String path) {
       reply += F("<TR><TD>Unknown error at address 0x");
       reply += String(address, HEX);
     }
+   Wire.begin();
   }
 #endif
   if (nDevices == 0)

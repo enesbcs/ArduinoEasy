@@ -36,7 +36,11 @@
 
 #define USES_C001   // Domoticz HTTP ~2kB
 #define USES_C002   // Domoticz MQTT ~48kB
+#define USES_C004   // Thingspeak 848bytes
 #define USES_C005   // OpenHAB MQTT ~4kB
+#define USES_C008   // GenHTTP ~1.3kB
+#define USES_C009   // FHEM HTTP ~3.1kB
+#define USES_C010   // GenUDP 808bytes
 
 #define USES_P001   // Switch ~4-6kB
 #define USES_P002   // ADC    344bytes
@@ -44,14 +48,23 @@
 #define USES_P004   // Dallas ~2kB
 #define USES_P005   // DHT    ~1.3kB
 #define USES_P010   // BH1750 848bytes
-#define USES_P014   // SI7021 ~1.4kB
+#define USES_P013   // HCSR04  ~1.2kB
+#define USES_P014   // SI7021  ~1.4kB
+#define USES_P015   // TLS2561 ~1.3kB
+#define USES_P017   // PN532   ~1.7kB
+#define USES_P021   // Level   ~1.7kB
 #define USES_P023   // OLED (experimental, font size halved) ~3.8kB
+#define USES_P024   // MLX90614 808bytes
 #define USES_P026   // SysInfo  640bytes
+#define USES_P027   // INA219  ~1.1kB
 #define USES_P028   // BMx280  ~9kB
 #define USES_P029   // Output  184bytes
+#define USES_P030   // BMP280  ~2.3kB
+#define USES_P031   // SHT1X   ~1.8kB
+#define USES_P032   // MS5611  ~2kB
 #define USES_P033   // Dummy   928bytes
 #define USES_P034   // DHT12   528bytes
-#define USES_P038   // Neopixel/WS2812 ~1k
+#define USES_P038   // Neopixel/WS2812 ~1k -- only for STM32 Roger Clark Core
 #define USES_P051   // AM2320  720bytes
 
 // Challenges on Arduino/W5100 ethernet platform:
@@ -111,7 +124,7 @@
   #define TASKS_MAX                          8 // ESP Easy 12, Arduino maybe 4/8
  #endif
 #else
- #define DEVICES_MAX                        16 // ESP Easy 64
+ #define DEVICES_MAX                         32 // ESP Easy 64
  #ifndef TASKS_MAX
   #define TASKS_MAX                          16 // ESP Easy 12, STM32 with 128k flash=4/8, if more can be 8/16!
  #endif
@@ -262,6 +275,10 @@
 
 #if FEATURE_I2C
   #include <Wire.h> // STM32 SDA=PB7,SCL=PB6
+  #if defined(STM32_F1)
+   TwoWire WIRE2 (1);
+   #define Wire WIRE2
+  #endif
 #endif
 
 #if FEATURE_SD
@@ -313,7 +330,9 @@
      #error "Neither SD storage, nor STM32F1 flash storage is available!"
    #endif
   #endif
- #endif
+ #else
+     #error "STM32F1 flash storage is insufficent!" 
+ #endif 
 #endif
 
 #if defined(UID_BASE)

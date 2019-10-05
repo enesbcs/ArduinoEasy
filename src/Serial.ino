@@ -26,7 +26,7 @@ void serial()
         InputBuffer_Serial[SerialInByteCounter++] = SerialInByte;
     }
 
-    if (SerialInByte == '\n')
+    if ((SerialInByte == '\n') && (SerialInByteCounter>1))
     {
       InputBuffer_Serial[SerialInByteCounter] = 0; // serial data completed
       Serial.write('>');
