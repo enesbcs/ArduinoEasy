@@ -60,7 +60,7 @@
 #define USES_P028   // BMx280  ~9kB
 #define USES_P029   // Output  184bytes
 #define USES_P030   // BMP280  ~2.3kB
-#define USES_P031   // SHT1X   ~1.8kB
+#define USES_P031   // SHT1X   ~1.8kB     -- only for STM32 Roger Clark Core
 #define USES_P032   // MS5611  ~2kB
 #define USES_P033   // Dummy   928bytes
 #define USES_P034   // DHT12   528bytes
@@ -79,7 +79,7 @@
 // DO NOT MODIFY BELOW THIS LINE UNLESS YOU REALLY UNDERSTAND WHAT YOU DO!
 #define EMPTY_IP          "0.0.0.0"      // Leave it as zero
 
-#if (defined(USES_P034) || defined(USES_P010) || defined(USES_P014) || defined(USES_P023)|| defined(USES_P028)|| defined(USES_P051))
+#if (defined(USES_P034) || defined(USES_P010) || defined(USES_P014) || defined(USES_P023)|| defined(USES_P028)|| defined(USES_P051) || defined(USES_P015) || defined(USES_P017) || defined(USES_P024) || defined(USES_P027) || defined(USES_P030) || defined(USES_P032))
  #define FEATURE_I2C            true
 #else
  #define FEATURE_I2C            false
@@ -259,6 +259,11 @@
 
 #endif
 
+#ifdef STM32_OFFICIAL
+ #undef USES_P031 
+ #undef USES_P038
+#endif
+
 #include <SPI.h>
 #if (!defined(UID_BASE) && defined(EthernetShield)) || defined(STM32_OFFICIAL)
  #include <Ethernet.h>
@@ -274,9 +279,9 @@
 #endif
 
 #if FEATURE_I2C
-  #include <Wire.h> // STM32 SDA=PB7,SCL=PB6
-  #if defined(STM32_F1)
-   TwoWire WIRE2 (1);
+  #include <Wire.h> 
+  #if defined(STM32_F1) && !defined(STM32_OFFICIAL) // STM32 SDA=PB7,SCL=PB6
+   TwoWire WIRE2 (1);   // Make sure that I2C1 is used!
    #define Wire WIRE2
   #endif
 #endif
