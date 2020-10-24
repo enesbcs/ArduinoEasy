@@ -92,7 +92,7 @@
 
 #define ARDUINO_PROJECT_PID       2016110201L
 #define VERSION                             2
-#define BUILD                             156
+#define BUILD                             157
 #define BUILD_NOTES                        "STM32fix"
 
 #define NODE_TYPE_ID_ESP_EASY_STD           1

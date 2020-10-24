@@ -73,8 +73,13 @@ void callback(char* c_topic, byte* b_payload, unsigned int length) {
   strncpy(c_payload,(char*)b_payload,length);
   c_payload[length] = 0;
   statusLED(true);
-
   String log;
+  log=F("MQTT : Ignored too big message");
+  if (length>sizeof(c_payload)-1)
+  {
+    addLog(LOG_LEVEL_ERROR, log);
+    return;
+  }
   log=F("MQTT : Topic: ");
   log+=c_topic;
   addLog(LOG_LEVEL_DEBUG, log);
@@ -82,7 +87,7 @@ void callback(char* c_topic, byte* b_payload, unsigned int length) {
   log=F("MQTT : Payload: ");
   log+=c_payload;
   addLog(LOG_LEVEL_DEBUG, log);
-  
+
   struct EventStruct TempEvent;
   TempEvent.String1 = c_topic;
   TempEvent.String2 = c_payload;
@@ -108,7 +113,7 @@ void MQTTConnect()
   String LWTTopic = Settings.MQTTsubscribe;
   LWTTopic.replace(F("/#"), F("/status"));
   LWTTopic.replace(F("%sysname%"), Settings.Name);
-  
+
   String log = "";
   boolean MQTTresult = false;
 
